@@ -19,7 +19,13 @@
   </script>
 </head>
 <body>
-  <a-scene>
+  <button id="enter-vr"
+    style="position:fixed; top:20px; left:50%; transform:translateX(-50%);
+           z-index:9999; padding:24px 48px; font-size:32px;
+           border:none; border-radius:12px; background:#4CC3D9; color:#fff;">
+    Enter VR
+  </button>
+  <a-scene vr-mode-ui="enterVRButton: #enter-vr">
     <!-- Units are meters. Y is up. Negative Z is in front of you. -->
     <a-sky color="#9ED8F0"></a-sky>
     <a-plane rotation="-90 0 0" width="20" height="20" color="#7BC8A4"></a-plane>
