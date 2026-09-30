@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Hello Quest</title>
+  <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+  <script>
+    // Cycles the cube color each time a controller laser "clicks" it
+    AFRAME.registerComponent('color-on-click', {
+      init: function () {
+        const colors = ['#4CC3D9', '#EF2D5E', '#FFC65D', '#7BC8A4'];
+        let i = 0;
+        this.el.addEventListener('click', () => {
+          i = (i + 1) % colors.length;
+          this.el.setAttribute('color', colors[i]);
+        });
+      }
+    });
+  </script>
+</head>
+<body>
+  <a-scene>
+    <!-- Units are meters. Y is up. Negative Z is in front of you. -->
+    <a-sky color="#9ED8F0"></a-sky>
+    <a-plane rotation="-90 0 0" width="20" height="20" color="#7BC8A4"></a-plane>
+
+    <a-box class="clickable" position="0 1.2 -1.5" color="#4CC3D9" color-on-click
+           animation="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear"></a-box>
+
+    <a-text value="Hello Quest! Point at the cube and pull the trigger."
+            position="-1.4 2 -2" color="#222" width="4"></a-text>
+
+    <!-- One laser pointer per controller, only hits objects with class "clickable" -->
+    <a-entity laser-controls="hand: right" raycaster="objects: .clickable"></a-entity>
+    <a-entity laser-controls="hand: left" raycaster="objects: .clickable"></a-entity>
+  </a-scene>
+</body>
+</html>
