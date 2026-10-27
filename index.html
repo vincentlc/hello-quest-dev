@@ -200,18 +200,32 @@
       snowPuffSpeed: 1.3,
       snowPuffLifetime: 0.45,
 
-      // Crack decals (step 4): per Vincent's reference sketch, every active
-      // crack crosses through the same central point on the torso (not
-      // spread to different spots) -- see CRACK_MASTER_ORDER/CRACK_SLOTS
-      // for the fixed per-slot colors and crossing angles, and
-      // getCrackSlotsForLives for which slots a given hitsToExplode shows.
-      // crackCenter is in Copito's own el-local meters (same frame as
-      // copitoOffset), converted to the model's raw/pre-scale space at
-      // build time (see copito.worldToModelLocal) so each decal can be
-      // parented inside the model wrapper and inherit every animation
-      // (bob/sway/squash/wobble) for free, instead of drifting separately.
-      crackCenter: { x: 0, y: 0.82, z: 0.22 },
-      crackSize: 0.75, // big enough to read as a real fracture across the torso, not a small nick
+      // Crack decals (step 4): per Vincent's reference sketch, each active
+      // crack is a curved band wrapping the body's roundness -- built as a
+      // ribbon mesh of several short segments following an idealized
+      // sphere approximating the torso (CRACK_MASTER_ORDER/CRACK_SLOTS has
+      // the fixed per-slot crossing angle/sweep, getCrackSlotsForLives has
+      // which slots a given hitsToExplode shows). A real mesh-hugging
+      // version (raycasting the actual glTF surface) was tried first but
+      // the scarf's surface detail made the fitted curve noisy/broken; an
+      // idealized sphere is mathematically clean and the torso is close
+      // enough to spherical that it still reads as hugging the body.
+      // Centers/radii are in Copito's own el-local meters (same frame as
+      // copitoOffset); each ribbon's vertices are converted to the model's
+      // raw/pre-scale space at build time (see copito.worldToModelLocal)
+      // so it can be parented inside the model wrapper and inherit every
+      // animation (bob/sway/squash/wobble) for free, instead of drifting
+      // separately like the very first (flat, non-curved) version did.
+      crackTorsoCenter: { x: 0, y: 0.7, z: 0.03 },  // slots 1-4 cross here
+      crackTorsoRadius: 0.41,
+      // slots 6/7: a separate crossing point, lower than the face/eyes --
+      // spans roughly chin-height down to the top of the scarf.
+      crackUpperCenter: { x: 0, y: 0.88, z: -0.02 },
+      crackUpperRadius: 0.27,
+      crackSamples: 16,       // points per curve -- smooths the ribbon
+      crackCoreWidth: 0.02,   // meters
+      crackGlowWidth: 0.05,
+      crackGlowOpacity: 0.3,
 
       // Hit squash/wobble (step 4) rotate/scale around this point instead
       // of the model wrapper's own raw origin. The wrapper's local origin
@@ -251,7 +265,12 @@
         iceNose: '#2EC4B6',
         crownCyan: '#7DF9FF',
         sparkle: '#B8FFF4',
-        snowball: '#F4FFFD'
+        snowball: '#F4FFFD',
+        // Crack ribbons (step 4): dark core + bright icy glow, same colors
+        // across every slot (Vincent's call -- the earlier per-slot
+        // rainbow palette didn't match his reference).
+        crackCore: '#0A2A28',
+        crackGlow: '#7DF9FF'
       }
     };
 
@@ -601,31 +620,29 @@
 
     // ---------------------------------------------------------------------
     // CRACK_MASTER_ORDER / CRACK_SLOTS / getCrackSlotsForLives: Vincent's
-    // reference sketch -- six possible crack "slots", each a fixed color
-    // and fixed crossing angle, all crossing through the same central point
-    // on the torso (not spread to different spots). A snowman's type
+    // reference sketch -- six possible crack "slots", each a fixed crossing
+    // angle/sweep/group, all one shared color (CONFIG.colors.crackCore/
+    // crackGlow). Slots 1-4 cross through the torso's central point
+    // (group 'torso'); 6/7 cross through a separate, lower point near the
+    // chin/scarf (group 'upper') -- not all six piling onto one spot, which
+    // looked too busy once several were active at once. A snowman's type
     // (CONFIG.hitsToExplode: 1, 3, 5, or 7 lives -- no other value makes
-    // sense here) determines how many of those six are active, and they're
+    // sense here) determines how many of the six are active, and they're
     // always a SUFFIX of this one master order, not an arbitrary subset:
-    // slots 1/2 (red/amber) are always the final pair shown right before
-    // death, 3/4 (pink/green) are added before that for type 5+, and 6/7
-    // (blue) are added before even those for type 7. So a tougher snowman
-    // gets earlier cracks prepended, never new ones appended at the end --
-    // "dies right after cracking 1,2" stays true for every type that has
-    // them. `angle` is in degrees, used by makeCrackTexture to draw each
-    // slot's curve sweeping through the shared center at a different tilt
-    // (steepest/most-central for 1/2, widest for 6/7), so several active
-    // slots read as one crossing pattern, like the sketch, rather than
-    // needing separate plane positions per slot.
+    // slots 1/2 are always the final pair shown right before death, 3/4 are
+    // added before that for type 5+, and 6/7 are added before even those
+    // for type 7. So a tougher snowman gets earlier cracks prepended, never
+    // new ones appended at the end -- "cracks 1, 2, then dies" stays true
+    // for every type that reaches them.
     // ---------------------------------------------------------------------
     var CRACK_MASTER_ORDER = [6, 7, 3, 4, 1, 2];
     var CRACK_SLOTS = {
-      1: { angle: -20, core: '#A32D2D', glow: '#E24B4A' }, // red
-      2: { angle: 20, core: '#854F0B', glow: '#EF9F27' },  // amber
-      3: { angle: -45, core: '#72243E', glow: '#D4537E' }, // pink
-      4: { angle: 45, core: '#27500A', glow: '#97C459' },  // green
-      6: { angle: -70, core: '#0C447C', glow: '#378ADD' }, // blue
-      7: { angle: 70, core: '#042C53', glow: '#85B7EB' }   // blue, darker
+      1: { angle: -20, sweep: 85, group: 'torso' },
+      2: { angle: 20, sweep: 85, group: 'torso' },
+      3: { angle: -45, sweep: 70, group: 'torso' },
+      4: { angle: 45, sweep: 70, group: 'torso' },
+      6: { angle: -45, sweep: 48, group: 'upper' },
+      7: { angle: 45, sweep: 48, group: 'upper' }
     };
 
     function getCrackSlotsForLives(lives) {
@@ -1066,107 +1083,91 @@
       // One decal per active slot for this snowman's type
       // (getCrackSlotsForLives(CONFIG.hitsToExplode)), built once hidden
       // and just toggled visible as hitCount climbs / on reset, rather
-      // than created and torn down each time. All of them share the same
-      // position (CONFIG.crackCenter, nudged a hair apart in z per slot
-      // only to avoid z-fighting between coplanar decals) -- per Vincent's
-      // reference sketch, every crack crosses through the same central
-      // point, with only its drawn angle and color (CRACK_SLOTS) telling
-      // them apart, not separate spots on the body. Parented inside
-      // `this.model` (not `this.el`) so they move with every body
-      // animation -- see worldToModelLocal's comment for why that's what
-      // actually keeps them glued to Copito.
+      // than created and torn down each time. Each is a THREE.Group (core +
+      // glow ribbon mesh, see buildCrackRibbonMeshes) added directly to
+      // `this.model.object3D` -- raw three.js objects, not a-frame
+      // entities, since the geometry is custom-built per crack rather than
+      // a plain primitive. Parented inside the model (not `this.el`) so
+      // they move with every body animation, same reasoning as the
+      // original flat-decal version: see worldToModelLocal's comment.
       buildCrackDecals: function () {
         this.activeCrackSlots = getCrackSlotsForLives(CONFIG.hitsToExplode);
-        this.crackDecals = this.activeCrackSlots.map((slotKey, i) => this.buildCrackDecal(slotKey, i));
+        this.crackDecals = this.activeCrackSlots.map((slotKey) => this.buildCrackDecal(slotKey));
       },
 
-      buildCrackDecal: function (slotKey, index) {
-        var img = this.makeCrackTexture(slotKey);
-        this.el.sceneEl.querySelector('a-assets').appendChild(img);
-
-        var center = CONFIG.crackCenter;
-        var localPos = this.worldToModelLocal({
-          x: center.x, y: center.y, z: center.z + index * 0.002
-        });
-        var localSize = CONFIG.crackSize / CONFIG.copitoScale;
-
-        var decal = document.createElement('a-plane');
-        decal.setAttribute('width', localSize);
-        decal.setAttribute('height', localSize);
-        decal.setAttribute('position', localPos.x + ' ' + localPos.y + ' ' + localPos.z);
-        decal.setAttribute('material', 'src: #' + img.id + '; transparent: true; shader: flat; side: double; alphaTest: 0.02');
-        decal.setAttribute('visible', false);
-        this.model.appendChild(decal);
-        return decal;
-      },
-
-      // A single smooth curved sweep through the shared center (a
-      // quadratic bezier, gently bulging to read as wrapping the body's
-      // roundness), not the earlier jagged branching fracture -- per
-      // Vincent's reference sketch and his confirmation that this curved
-      // style read well. A soft glow halo behind it keeps it visible
-      // against the pale body; a bright highlight riding alongside gives
-      // it a "catching the light" sparkle. Colors and crossing angle come
-      // from CRACK_SLOTS[slotKey] -- fixed per slot, not randomized, so
-      // the same slot always looks the same regardless of which other
-      // slots happen to be active for a given snowman type. The glow is
-      // kept fairly tight around the line on purpose: with several slots
-      // crossing through the same point (tougher types), a wide halo on
-      // each one would bleed together into one undifferentiated blob.
-      makeCrackTexture: function (slotKey) {
+      buildCrackDecal: function (slotKey) {
+        var THREE = AFRAME.THREE;
         var slot = CRACK_SLOTS[slotKey];
-        var size = 256;
-        var canvas = document.createElement('canvas');
-        canvas.width = canvas.height = size;
-        var ctx = canvas.getContext('2d');
-        var cx = size / 2, cy = size / 2;
+        var isUpper = slot.group === 'upper';
+        var centerCfg = isUpper ? CONFIG.crackUpperCenter : CONFIG.crackTorsoCenter;
+        var radius = isUpper ? CONFIG.crackUpperRadius : CONFIG.crackTorsoRadius;
+        var center = new THREE.Vector3(centerCfg.x, centerCfg.y, centerCfg.z);
 
-        var outerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.3);
-        outerGlow.addColorStop(0, slot.glow + '55');
-        outerGlow.addColorStop(0.6, slot.glow + '22');
-        outerGlow.addColorStop(1, slot.glow + '00');
-        ctx.fillStyle = outerGlow;
-        ctx.fillRect(0, 0, size, size);
+        // Points + outward surface normals along an arc on an idealized
+        // sphere (el-local meters) -- see CONFIG.crackTorsoCenter's
+        // comment for why a sphere instead of the real mesh surface.
+        var slotRad = THREE.MathUtils.degToRad(slot.angle);
+        var curve = [];
+        for (var i = 0; i < CONFIG.crackSamples; i++) {
+          var t = i / (CONFIG.crackSamples - 1);
+          var theta = THREE.MathUtils.degToRad(-slot.sweep / 2 + t * slot.sweep);
+          var dir = new THREE.Vector3(0, 0, 1);
+          dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), theta);
+          dir.applyAxisAngle(new THREE.Vector3(0, 0, 1), slotRad);
+          dir.normalize();
+          curve.push({ point: center.clone().addScaledVector(dir, radius), normal: dir });
+        }
 
-        var coreGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.13);
-        coreGlow.addColorStop(0, slot.glow + 'AA');
-        coreGlow.addColorStop(1, slot.glow + '00');
-        ctx.fillStyle = coreGlow;
-        ctx.fillRect(0, 0, size, size);
+        var group = new THREE.Group();
+        group.add(this.buildCrackRibbonMesh(curve, CONFIG.crackGlowWidth, CONFIG.colors.crackGlow, CONFIG.crackGlowOpacity));
+        group.add(this.buildCrackRibbonMesh(curve, CONFIG.crackCoreWidth, CONFIG.colors.crackCore, 1));
+        group.visible = false;
+        this.model.object3D.add(group);
+        return group;
+      },
 
-        var rad = slot.angle * Math.PI / 180;
-        var dx = Math.cos(rad), dy = Math.sin(rad);
-        var px = -dy, py = dx; // perpendicular, for the curve's bulge
-        var reach = size * 0.42;
-        var bulge = size * 0.1;
-        var x0 = cx - dx * reach, y0 = cy - dy * reach;
-        var x1 = cx + dx * reach, y1 = cy + dy * reach;
-        var ctrlX = cx + px * bulge, ctrlY = cy + py * bulge;
-
-        var drawCurve = (color, width, offset) => {
-          ctx.strokeStyle = color;
-          ctx.lineWidth = width;
-          ctx.lineCap = 'round';
-          ctx.beginPath();
-          ctx.moveTo(x0 + offset, y0 + offset);
-          ctx.quadraticCurveTo(ctrlX + offset, ctrlY + offset, x1 + offset, y1 + offset);
-          ctx.stroke();
-        };
-        drawCurve(slot.core, 9, 0);
-        drawCurve(slot.glow, 3.5, -1.5);
-
-        var img = document.createElement('img');
-        img.id = 'crackDecal' + this.instanceId + '_' + slotKey;
-        img.src = canvas.toDataURL();
-        return img;
+      // One ribbon (ladder of quads following `curve`, width wide, flat
+      // solid color) -- called twice per crack, once for the glow (wide,
+      // translucent) and once for the core (narrow, opaque), stacked in a
+      // group. The cross-section direction at each point uses that
+      // sample's own outward normal, not a single fixed "up" vector -- a
+      // fixed axis flips sign as the curve sweeps around the body and
+      // pinches the ribbon into a bowtie; the normal varies smoothly with
+      // the curve instead. Vertices are converted to the model's raw/
+      // pre-scale local space (worldToModelLocal) so the mesh can be
+      // parented directly inside `this.model.object3D`.
+      buildCrackRibbonMesh: function (curve, width, color, opacity) {
+        var THREE = AFRAME.THREE;
+        var positions = [];
+        for (var i = 0; i < curve.length; i++) {
+          var tangent = (i < curve.length - 1 ? curve[i + 1].point : curve[i].point).clone()
+            .sub(i < curve.length - 1 ? curve[i].point : curve[i - 1].point).normalize();
+          var side = new THREE.Vector3().crossVectors(tangent, curve[i].normal).normalize().multiplyScalar(width / 2);
+          var edgeA = this.worldToModelLocal(curve[i].point.clone().add(side));
+          var edgeB = this.worldToModelLocal(curve[i].point.clone().sub(side));
+          positions.push(edgeA.x, edgeA.y, edgeA.z, edgeB.x, edgeB.y, edgeB.z);
+        }
+        var indices = [];
+        for (var i = 0; i < curve.length - 1; i++) {
+          var p = i * 2, q = i * 2 + 1, r = i * 2 + 2, s = i * 2 + 3;
+          indices.push(p, q, r, q, s, r);
+        }
+        var geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geo.setIndex(indices);
+        var mat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(color), side: THREE.DoubleSide,
+          transparent: opacity < 1, opacity: opacity, depthWrite: opacity >= 1
+        });
+        return new THREE.Mesh(geo, mat);
       },
 
       showCrackDecal: function (index) {
-        this.crackDecals[index].setAttribute('visible', true);
+        this.crackDecals[index].visible = true;
       },
 
       hideCrackDecals: function () {
-        this.crackDecals.forEach((d) => d.setAttribute('visible', false));
+        this.crackDecals.forEach((d) => { d.visible = false; });
       },
 
       // ~120 orbiting points around Copito's body, one THREE.Points buffer

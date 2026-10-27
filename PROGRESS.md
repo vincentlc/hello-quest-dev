@@ -609,6 +609,79 @@ flat jagged fracture decals).
 - **Not yet tested:** an actual Quest 2 headset, same outstanding item as
   every step since step 3.
 
+**Step 4 crack redesign, round 2 (same session, after Vincent reviewed the
+first redesign against a screenshot):** three more issues, all fixed:
+
+1. **Color.** Vincent wanted the original cyan/glow look back (not the
+   red/amber/pink/green/blue-per-slot palette from redesign round 1). All
+   six slots now share one color (`CONFIG.colors.crackCore` '#0A2A28' /
+   `crackGlow` '#7DF9FF'), restored into `CONFIG.colors` after having been
+   removed.
+2. **Actually hugging the body, not a flat floating card.** The flat decal
+   plane read as detached/floating once seen up close (visible gap between
+   the glowing line and the body surface beneath it). Replaced with a real
+   ribbon mesh: several short quad segments following a curve, each
+   oriented to the curve's local outward direction so it sits flush against
+   the body rather than being one rigid flat plane. Two approaches were
+   tried:
+   - **Raycasting the actual glTF mesh** for the curve's points (so it
+     would hug the *real*, not idealized, surface) seemed like the more
+     accurate choice, but repeatedly produced broken/pinched geometry in
+     testing -- traced to the scarf's surface detail (ridges, folds)
+     injecting noise into the per-point surface normals, which a
+     hand-rolled ribbon cross-section (`cross(tangent, normal)`) is
+     numerically sensitive to: a near-degenerate normal at one sample
+     collapses that point's ribbon width toward zero, reading as a pinch
+     or a "bowtie". Also cost real debugging time chasing what first
+     looked like a geometry bug but turned out to be the preview camera
+     sitting too close to the crack geometry (near-clip distortion) for
+     several iterations -- worth remembering if ribbon/curve geometry ever
+     looks broken again: check camera distance before assuming the math is
+     wrong.
+   - **An idealized sphere approximating the torso** (`CONFIG.crackTorso
+     Center`/`crackTorsoRadius`) replaced it: mathematically clean points
+     and normals by construction (a sphere's outward normal is just
+     `(point - center)`, never degenerate), and the torso is close enough
+     to actually spherical that it still reads as hugging the real body.
+     This is what shipped. If a future session wants to revisit true
+     mesh-hugging, the lesson here is to fix the ribbon math's robustness
+     to noisy normals first (e.g. smooth/average normals across neighbors,
+     or fall back to a stable reference direction when the cross product's
+     magnitude drops near zero) rather than assuming raycasting alone
+     will produce clean geometry.
+   - Each ribbon is a `THREE.Group` of two meshes (wide translucent glow +
+     narrow opaque core), built once per active slot and added directly to
+     `this.model.object3D` (raw three.js objects, not a-frame entities,
+     since the geometry is custom per crack) -- same "parent inside the
+     animated model" trick as the flat-decal version for free animation
+     tracking, confirmed still working (sampled world position during a
+     fresh squash/wobble impulse and again 100ms later: moves smoothly
+     with the body).
+3. **Not all 6 crossing one point.** With six bands converging on a single
+   spot (type 7), the result was visually busy and the two "outer" (6/7)
+   bands initially swept right across the eyes/face, which also read as
+   wrong because it visually conflicted with the hat. Split into two
+   separate crossing points instead: slots 1-4 (`group: 'torso'`) still
+   cross at the main torso center; slots 6/7 (`group: 'upper'`,
+   `CONFIG.crackUpperCenter`/`crackUpperRadius`) cross at a separate, lower
+   point spanning roughly chin-height down to the top of the scarf, clear
+   of both the eyes and the hat.
+- **Process note:** Vincent asked to see a rendered preview before each
+  round of changes landed in the file. Delivered by live-patching the
+  already-loaded page in the browser (mutating `CRACK_SLOTS`/CONFIG,
+  rebuilding the affected crack meshes, screenshotting) rather than editing
+  `index.html` and reloading each time -- let several layout/color options
+  get checked and discarded in-browser before committing to one and
+  porting it into the real component code, which is what actually landed.
+- **Tested this session:** the final design re-verified through the real
+  component code (not just the live-patched preview) for both type 3
+  (slots [1,2]) and type 7 (all six, split across the two crossing points)
+  with screenshots matching what was approved; hitbox, landing/stacking,
+  and the snowman registry all re-confirmed still working together (full
+  regression pass); zero console errors throughout.
+- **Not yet tested:** an actual Quest 2 headset, same outstanding item as
+  every step since step 3.
+
 <details>
 <summary>Original step 4 brief (superseded by the DONE notes above)</summary>
 
