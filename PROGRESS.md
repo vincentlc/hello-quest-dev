@@ -383,8 +383,86 @@ note below for how the two steps meet.
 
 </details>
 
-**Step 4 — 3-hit reactions: not started. Prepared brief (adapted for the
-single-mesh model):**
+**Step 4 — 3-hit reactions + snowball packing/stacking: DONE.**
+
+- **Hit reactions**, all driven by the `snowball-hit` event `snowball-thrower`
+  already emits (step 3's contract): `copito` tracks `hitCount` and listens
+  for it.
+  - Hit 1: whole-model squash-stretch (decaying damped-oscillation impulse,
+    see `computeImpulse`, applied as a delta on top of `copitoScale` the same
+    way idle bob/sway are deltas on top of `copitoOffset` — hit reactions and
+    idle animation never fight over the transform) + a brief material
+    color-flash (materials collected once via the model's `model-loaded`
+    event, traversed and cached with their original colors so the flash can
+    revert exactly) + a snow-puff particle burst at the impact point (one
+    shared `THREE.Points` pool, `CONFIG.snowPuffCount` particles, reused
+    every hit rather than allocated per hit).
+  - Hit 2: bigger squash (`CONFIG.hitSquashAmplitude[1]`) + an added wobble
+    rotation (`CONFIG.hitWobbleAmplitude`, same decaying-impulse mechanism,
+    on `rotation.z`/`rotation.x`) + a crack decal: a canvas-drawn crack
+    texture on a plane, built once at init and just toggled visible/hidden
+    rather than created per hit. **Simplification from the original
+    brief:** the wobble rotates the model wrapper around its own base
+    origin (feet), not a pivot at head height — the model's corrective
+    offset (`copitoOffset`) already puts that origin near the ground, and a
+    true head-height pivot would need extra pivot-point math for a fused
+    mesh with no separable parts. Reads fine as "shaken" in testing; revisit
+    only if Vincent flags it as too subtle/wrong-feeling in VR.
+  - Hit 3: per the event contract, emits `snowman-destroyed` on `#copito`
+    (step 5's hook) and, since step 5's explosion/respawn isn't built yet,
+    resets `hitCount` to 0 and hides the crack decal immediately rather than
+    leaving Copito stuck mid-damage with no recovery. Swap this reset for
+    the real explosion when step 5 lands.
+  - Crack sound: **deferred to step 6** (no audio assets wired up yet, same
+    as the rest of sound/haptics).
+- **Snowball packing/stacking (new, requested alongside step 4, not in the
+  original spec):** a miss that reaches the ground no longer vanishes after
+  `snowballLifetime` — `snowball-thrower.tick()` now checks
+  `pos.y <= CONFIG.snowballRadius` for any flying snowball and, if hit,
+  calls `land()` instead of `deactivate()`. A landed snowball eases into a
+  squashed "packed into the snow" shape over `CONFIG.landedSquashTime`
+  (scale eased toward `CONFIG.landedSquashXZ`/`landedSquashY`) and just sits
+  there, visible, no longer simulated.
+  - **The limit** is `CONFIG.maxLandedSnowballs` (8): landed slots are
+    tracked in a small FIFO (`this.landed`). Once a new landing would exceed
+    the cap, the oldest landed snowball is freed back to the pool
+    immediately — no extra cleanup pass needed.
+  - **Pool reuse was the one subtlety:** the existing throw pool already
+    reuses slots round-robin (`spawn()`); a landed snowball just occupies its
+    slot until that same round-robin comes back around to it, at which point
+    it's thrown again like any other slot. `spawn()` only needed one new
+    line (drop the slot from the `landed` FIFO if it was currently landed)
+    for this to work correctly — confirmed by scripted testing (see below)
+    that round-robin naturally evicts the oldest landed ball once 11 misses
+    are thrown in a row.
+  - A hit on Copito still vanishes immediately (unchanged) — only misses
+    that reach the ground stack up; this matches what was actually asked
+    for ("they are going to stack, where they landed, like on the ground").
+  - **Known interaction, not a bug:** `maxSnowballs` (pool size, 12) is
+    shared between flying + landed + free. With up to 8 reserved for landed,
+    only 4 slots cycle for actively-in-flight balls. Fine at normal human
+    throwing pace (cooldown 0.25s, typical flight-to-ground well under 1s in
+    testing) — only matters if someone spams throws far faster than balls
+    can land, in which case the round-robin would start recycling slots
+    sooner than `maxLandedSnowballs` would suggest. Not tuned further since
+    it didn't come up in testing; revisit `maxSnowballs` upward if it ever
+    does.
+- **Tested this session** (same headless-pane constraint as step 3: no
+  on-demand `requestAnimationFrame`, so verified by manually driving
+  `tick()` in 16ms steps from real `spawn()`/event calls, not by watching
+  real-time flight): confirmed landed count climbs then holds exactly at
+  `maxLandedSnowballs` (8) across 11 scripted misses, with evicted slots
+  correctly returning to `free`; confirmed the 3-hit sequence against Copito
+  (hitCount 1 → squash + flash + puff fire, 2 → crack decal appears, 3 →
+  resets cleanly, crack hidden again); confirmed a landed pile is visibly a
+  flattened white mound in a screenshot (see session), not just correct
+  state. Zero console errors throughout. **Not yet tested: an actual Quest 2
+  headset** (hit reactions and the landed pile from real trigger throws,
+  not scripted ones) — same outstanding item as step 3.
+
+<details>
+<summary>Original step 4 brief (superseded by the DONE notes above)</summary>
+
 - Hit 1: whole-model squash-stretch scale pulse + brief material
   color-flash (grab the mesh's material(s) via
   `this.model.getObject3D('mesh').traverse(...)`, tween color/emissive then
@@ -397,6 +475,8 @@ single-mesh model):**
   over the front of the torso — independent of mesh structure, works fine)
   + sparkle system sped up + crack sound.
 - Hit 3: hands off to step 5.
+
+</details>
 
 **Step 5 — explosion + respawn: not started.** Chunks (40-60): use
 `THREE.InstancedMesh` (two instances — snow lumps, ice shards — already

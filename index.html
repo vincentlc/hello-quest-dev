@@ -145,6 +145,16 @@
       trajectoryDots: 12,
       trajectoryDotInterval: 0.08, // seconds of flight time between dots
 
+      // Landed snowballs (step 4): a miss that reaches the ground packs
+      // flat and stays there instead of vanishing, up to this many at once.
+      // The pool's existing round-robin reuse (see snowball-thrower.spawn)
+      // naturally evicts the oldest landed one once the cap is hit -- no
+      // separate timer needed, it just gets thrown again like a fresh ball.
+      maxLandedSnowballs: 8,
+      landedSquashY: 0.45,  // scale.y multiplier once packed into the ground
+      landedSquashXZ: 1.3,  // scale.x/z multiplier (spreads out as it flattens)
+      landedSquashTime: 0.12, // seconds to ease into the squashed shape
+
       // Hits and explosion (steps 4-5)
       hitsToExplode: 3,
       chunkCount: 50,
@@ -153,6 +163,19 @@
       respawnDelay: 2.5,
       idleSparkleCount: 120,
       explosionSparkleCount: 250,
+
+      // Hit reactions (step 4). Squash/wobble amplitudes are indexed by
+      // hitCount - 1 (hit 1, then the bigger hit 2). Applied as decaying
+      // impulses on top of the idle bob/sway, same pattern as those.
+      hitSquashAmplitude: [0.16, 0.3],
+      hitWobbleAmplitude: [0.0, 0.22], // extra rotation wobble, hit 2 only
+      hitImpulseDuration: 0.5,     // seconds for the squash/wobble to decay out
+      hitImpulseFrequency: 4,     // Hz, how fast the squash/wobble oscillates while decaying
+      hitFlashColor: '#FFFFFF',
+      hitFlashDuration: 0.12,      // seconds the material stays flashed
+      snowPuffCount: 24,
+      snowPuffSpeed: 1.3,
+      snowPuffLifetime: 0.45,
 
       // Sound volumes 0 to 1 (step 6)
       volume: {
@@ -278,6 +301,9 @@
         var THREE = AFRAME.THREE;
         this.pool = [];
         this.nextIndex = 0;
+        // FIFO of currently-landed slots, oldest first -- bounded by
+        // CONFIG.maxLandedSnowballs (see land()/evictOldestLanded()).
+        this.landed = [];
         for (var i = 0; i < CONFIG.maxSnowballs; i++) {
           var el = document.createElement('a-sphere');
           el.setAttribute('radius', CONFIG.snowballRadius);
@@ -286,7 +312,10 @@
           el.setAttribute('material', 'color: ' + CONFIG.colors.snowball + '; roughness: 0.6; metalness: 0');
           el.setAttribute('visible', false);
           this.el.appendChild(el);
-          this.pool.push({ el: el, active: false, velocity: new THREE.Vector3(), spawnTime: 0 });
+          // state: 'free' (available to throw) | 'flying' (ballistic, gets
+          // physics + hit checks) | 'landed' (static, packed into the
+          // ground, just sitting there until its slot is reused).
+          this.pool.push({ el: el, state: 'free', velocity: new THREE.Vector3(), spawnTime: 0, landTime: 0 });
         }
       },
 
@@ -317,9 +346,17 @@
         var sb = this.pool[this.nextIndex];
         this.nextIndex = (this.nextIndex + 1) % this.pool.length;
 
-        sb.active = true;
+        // Reusing a slot that's currently sitting packed on the ground --
+        // drop it from the landed FIFO first, since it's about to fly again.
+        if (sb.state === 'landed') {
+          var idx = this.landed.indexOf(sb);
+          if (idx !== -1) this.landed.splice(idx, 1);
+        }
+
+        sb.state = 'flying';
         sb.spawnTime = this.lastTickTime;
         sb.el.object3D.position.copy(origin);
+        sb.el.object3D.scale.set(1, 1, 1);
         sb.el.object3D.visible = true;
 
         sb.velocity.copy(direction).normalize().multiplyScalar(CONFIG.throwSpeed);
@@ -327,8 +364,23 @@
       },
 
       deactivate: function (sb) {
-        sb.active = false;
+        sb.state = 'free';
         sb.el.object3D.visible = false;
+      },
+
+      // A miss that reaches the ground packs flat and stays there (reads as
+      // snow piling up) instead of vanishing. Bounded by maxLandedSnowballs:
+      // once full, the oldest landed ball is freed back to the pool so the
+      // round-robin in spawn() can reuse its slot immediately.
+      land: function (sb) {
+        sb.state = 'landed';
+        sb.landTime = this.lastTickTime;
+        sb.velocity.set(0, 0, 0);
+        sb.el.object3D.position.y = CONFIG.snowballRadius * CONFIG.landedSquashY;
+        this.landed.push(sb);
+        if (this.landed.length > CONFIG.maxLandedSnowballs) {
+          this.deactivate(this.landed.shift());
+        }
       },
 
       pulseHaptics: function (handEl, intensity, durationMs) {
@@ -350,7 +402,21 @@
 
         for (var i = 0; i < this.pool.length; i++) {
           var sb = this.pool[i];
-          if (!sb.active) continue;
+
+          if (sb.state === 'landed') {
+            // Ease the squash in over landedSquashTime instead of snapping,
+            // so it still reads as a soft "pack" rather than a pop.
+            var sinceLand = (time - sb.landTime) / 1000;
+            var squashT = Math.min(sinceLand / CONFIG.landedSquashTime, 1);
+            sb.el.object3D.scale.set(
+              1 + (CONFIG.landedSquashXZ - 1) * squashT,
+              1 + (CONFIG.landedSquashY - 1) * squashT,
+              1 + (CONFIG.landedSquashXZ - 1) * squashT
+            );
+            continue;
+          }
+
+          if (sb.state !== 'flying') continue;
 
           sb.velocity.y -= CONFIG.gravity * dt;
           sb.el.object3D.position.addScaledVector(sb.velocity, dt);
@@ -359,6 +425,11 @@
           if (pos.distanceTo(this.scratchCopitoPos) <= CONFIG.snowballHitRadius) {
             this.copito.emit('snowball-hit', { point: { x: pos.x, y: pos.y, z: pos.z } });
             this.deactivate(sb);
+            continue;
+          }
+
+          if (pos.y <= CONFIG.snowballRadius) {
+            this.land(sb);
             continue;
           }
 
@@ -561,6 +632,20 @@
         this.modelBasePosition = { x: offset[0], y: offset[1], z: offset[2] };
 
         this.buildSparkles();
+
+        // Hit reactions (step 4). hitCount drives three escalating stages;
+        // see onHit. Materials are collected once the glTF is actually in
+        // the scene graph (traversing before model-loaded finds nothing).
+        this.hitCount = 0;
+        this.lastTime = 0;
+        this.materials = null;
+        this.flashUntil = undefined;
+        this.squashImpulse = { time: -Infinity, amplitude: 0 };
+        this.wobbleImpulse = { time: -Infinity, amplitude: 0 };
+        this.model.addEventListener('model-loaded', () => this.collectMaterials());
+        this.buildSnowPuffs();
+        this.buildCrackDecal();
+        this.el.addEventListener('snowball-hit', (evt) => this.onHit(evt.detail));
       },
 
       // Idle bob (vertical sine) + slight sway (side-to-side tilt), applied
@@ -569,6 +654,7 @@
       // separable eyes (see PROGRESS.md step 2), and the bob/sway/sparkles
       // combo already reads as alive without it.
       tick: function (time) {
+        this.lastTime = time;
         var t = time / 1000;
         var bob = Math.sin((t / CONFIG.idleBobPeriod) * Math.PI * 2) * CONFIG.idleBobAmplitude;
         var sway = Math.sin((t / CONFIG.idleSwayPeriod) * Math.PI * 2) * CONFIG.idleSwayAmplitude;
@@ -578,9 +664,192 @@
           this.modelBasePosition.y + bob,
           this.modelBasePosition.z
         );
-        this.model.object3D.rotation.z = sway;
 
+        // Hit squash/wobble (step 4): decaying impulses layered on top of
+        // the idle sway/scale, same "deltas on top of the base transform"
+        // pattern as bob/sway above, so hit reactions and idle animation
+        // never fight over the same transform.
+        var squash = this.computeImpulse(time, this.squashImpulse);
+        var wobble = this.computeImpulse(time, this.wobbleImpulse);
+        var scaleY = CONFIG.copitoScale * (1 - squash);
+        var scaleXZ = CONFIG.copitoScale * (1 + squash * 0.5);
+        this.model.object3D.scale.set(scaleXZ, scaleY, scaleXZ);
+        this.model.object3D.rotation.z = sway + wobble;
+        this.model.object3D.rotation.x = wobble * 0.6;
+
+        this.revertFlashIfDone(time);
+        this.updateSnowPuffs(time);
         this.updateSparkles(t);
+      },
+
+      // A damped, decaying oscillation starting at full amplitude the
+      // instant it's triggered (impulse.time) and settling back to 0 by
+      // CONFIG.hitImpulseDuration later. Shared by the squash and wobble
+      // impulses -- same shape, different amplitude/axis.
+      computeImpulse: function (time, impulse) {
+        var elapsed = (time - impulse.time) / 1000;
+        if (elapsed < 0 || elapsed > CONFIG.hitImpulseDuration || impulse.amplitude === 0) return 0;
+        var decay = 1 - elapsed / CONFIG.hitImpulseDuration;
+        return impulse.amplitude * decay * -Math.cos(elapsed * CONFIG.hitImpulseFrequency * Math.PI * 2);
+      },
+
+      // Escalating reaction per hit, per the step 4 brief: squash+flash+puff
+      // on hit 1, a bigger wobble + crack decal on hit 2. Hit 3 hands off to
+      // step 5's explosion (not built yet), so for now it just resets clean
+      // rather than leaving Copito stuck mid-damage.
+      onHit: function (detail) {
+        var time = this.lastTime;
+        this.hitCount++;
+
+        this.spawnSnowPuff(detail.point);
+        this.flashMaterials(time);
+        this.squashImpulse.time = time;
+        this.squashImpulse.amplitude = CONFIG.hitSquashAmplitude[Math.min(this.hitCount, 2) - 1];
+
+        if (this.hitCount === 2) {
+          this.wobbleImpulse.time = time;
+          this.wobbleImpulse.amplitude = CONFIG.hitWobbleAmplitude[1];
+          this.showCrackDecal();
+        }
+
+        if (this.hitCount >= CONFIG.hitsToExplode) {
+          this.el.emit('snowman-destroyed', { point: detail.point });
+          this.hitCount = 0;
+          this.hideCrackDecal();
+        }
+      },
+
+      collectMaterials: function () {
+        var mesh = this.model.getObject3D('mesh');
+        if (!mesh) return;
+        this.materials = [];
+        var seen = {};
+        mesh.traverse((node) => {
+          if (!node.material) return;
+          var mats = Array.isArray(node.material) ? node.material : [node.material];
+          mats.forEach((mat) => {
+            if (seen[mat.uuid] || !mat.color) return;
+            seen[mat.uuid] = true;
+            this.materials.push({ material: mat, originalColor: mat.color.clone() });
+          });
+        });
+      },
+
+      flashMaterials: function (time) {
+        if (!this.materials) return;
+        this.flashUntil = time + CONFIG.hitFlashDuration * 1000;
+        this.materials.forEach((m) => m.material.color.set(CONFIG.hitFlashColor));
+      },
+
+      revertFlashIfDone: function (time) {
+        if (this.flashUntil === undefined || time < this.flashUntil) return;
+        this.materials.forEach((m) => m.material.color.copy(m.originalColor));
+        this.flashUntil = undefined;
+      },
+
+      // One shared THREE.Points burst (not per-hit entities) placed in world
+      // space at the impact point, reused every hit -- particles beyond
+      // their lifetime just stop being written to visible positions.
+      buildSnowPuffs: function () {
+        var THREE = AFRAME.THREE;
+        var n = CONFIG.snowPuffCount;
+        this.puffVelocities = [];
+        this.puffSpawnTime = new Float32Array(n);
+        this.puffOrigin = new THREE.Vector3();
+        for (var i = 0; i < n; i++) this.puffVelocities.push(new THREE.Vector3());
+
+        var geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+
+        this.snowPuffs = new THREE.Points(geometry, new THREE.PointsMaterial({
+          color: new THREE.Color(CONFIG.colors.snowLight),
+          size: 0.05,
+          sizeAttenuation: true,
+          transparent: true,
+          opacity: 0.9,
+          depthWrite: false
+        }));
+        this.snowPuffs.visible = false;
+        this.el.sceneEl.object3D.add(this.snowPuffs);
+      },
+
+      spawnSnowPuff: function (point) {
+        var n = CONFIG.snowPuffCount;
+        this.puffOrigin.set(point.x, point.y, point.z);
+        for (var i = 0; i < n; i++) {
+          this.puffVelocities[i].set(
+            Math.random() * 2 - 1,
+            0.2 + Math.random() * 1.2,
+            Math.random() * 2 - 1
+          ).normalize().multiplyScalar(CONFIG.snowPuffSpeed * (0.5 + Math.random() * 0.5));
+          this.puffSpawnTime[i] = this.lastTime;
+        }
+        this.snowPuffs.visible = true;
+        this.snowPuffs.material.opacity = 0.9;
+      },
+
+      updateSnowPuffs: function (time) {
+        if (!this.snowPuffs.visible) return;
+        var n = CONFIG.snowPuffCount;
+        var positions = this.snowPuffs.geometry.attributes.position.array;
+        var anyAlive = false;
+
+        for (var i = 0; i < n; i++) {
+          var age = (time - this.puffSpawnTime[i]) / 1000;
+          if (age > CONFIG.snowPuffLifetime) continue;
+          anyAlive = true;
+          // Light gravity droop (a fraction of real gravity) so the puff
+          // reads as soft snow drifting, not a heavy ballistic snowball.
+          positions[i * 3] = this.puffOrigin.x + this.puffVelocities[i].x * age;
+          positions[i * 3 + 1] = this.puffOrigin.y + this.puffVelocities[i].y * age - 0.5 * (CONFIG.gravity * 0.3) * age * age;
+          positions[i * 3 + 2] = this.puffOrigin.z + this.puffVelocities[i].z * age;
+        }
+
+        this.snowPuffs.geometry.attributes.position.needsUpdate = true;
+        if (!anyAlive) this.snowPuffs.visible = false;
+      },
+
+      // Built once (hidden) and just toggled visible/invisible on hit
+      // 2/reset, rather than created and torn down each time. Position is
+      // an approximate torso height/depth for CONFIG.snowmanHeight -- tune
+      // here if it floats off the body once seen on a real headset.
+      buildCrackDecal: function () {
+        var canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 128;
+        var ctx = canvas.getContext('2d');
+        ctx.strokeStyle = 'rgba(15,45,45,0.85)';
+        ctx.lineWidth = 3;
+        var cx = 64, cy = 64;
+        [[30, 10], [104, 24], [16, 110], [112, 104], [64, 122]].forEach((p) => {
+          var midX = (cx + p[0]) / 2 + (Math.random() * 16 - 8);
+          var midY = (cy + p[1]) / 2 + (Math.random() * 16 - 8);
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(midX, midY);
+          ctx.lineTo(p[0], p[1]);
+          ctx.stroke();
+        });
+
+        var img = document.createElement('img');
+        img.id = 'crackDecal';
+        img.src = canvas.toDataURL();
+        this.el.sceneEl.querySelector('a-assets').appendChild(img);
+
+        this.crackDecal = document.createElement('a-plane');
+        this.crackDecal.setAttribute('width', 0.5);
+        this.crackDecal.setAttribute('height', 0.5);
+        this.crackDecal.setAttribute('position', '0 0.9 0.25');
+        this.crackDecal.setAttribute('material', 'src: #crackDecal; transparent: true; shader: flat; side: double');
+        this.crackDecal.setAttribute('visible', false);
+        this.el.appendChild(this.crackDecal);
+      },
+
+      showCrackDecal: function () {
+        this.crackDecal.setAttribute('visible', true);
+      },
+
+      hideCrackDecal: function () {
+        this.crackDecal.setAttribute('visible', false);
       },
 
       // ~120 orbiting points around Copito's body, one THREE.Points buffer
