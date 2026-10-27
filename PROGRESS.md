@@ -229,24 +229,24 @@ the step-by-step status.
 (with the deviations above layered on top, all verified working, zero
 console errors as of this writing).
 
-**Step 2 — idle animation + sparkles: DONE.**
-- Bob (2cm, 2.5s sine) + slight sway (~2deg, 3.2s sine, deliberately
-  different period so it doesn't read as a mechanical loop): implemented in
-  `copito`'s `tick(time)` handler, applied as deltas on top of
-  `CONFIG.copitoOffset` on `this.model.object3D` (position.y and
-  rotation.z). Tunables added to `CONFIG`: `idleBobAmplitude`,
-  `idleBobPeriod`, `idleSwayAmplitude`, `idleSwayPeriod`.
-- Blink: **skipped** (option (a) from the brief). Tried it visually with
-  just bob+sway+sparkles running and it already reads as alive; not building
-  the fake-eyelid-overlay hack unless Vincent flags it as needed.
-- Crown shimmer: dropped, not applicable (hat, not a crystal crown).
-- Sparkles (120 orbiting points): one `THREE.Points` buffer geometry
-  (`copito.buildSparkles`/`updateSparkles`), attached to the outer `el`'s
-  `object3D` (ground level under Copito) so they orbit independently of the
-  model wrapper's bob/sway. Per-point angle/speed/radius/height/phase are
-  randomized once at init and advanced each tick; verified visually in the
-  browser (sparkle positions clearly shift frame to frame, zero console
-  errors).
+**Step 2 — idle animation + sparkles: NEXT. Prepared brief:**
+- Bob (2cm, 2.5s sine) + slight sway: animate the whole `this.model` wrapper
+  entity's position/rotation in a `tick(time)` handler (not the declarative
+  `animation` component — easier to compose with later state like hit-wobble
+  and the respawn scale-pop without fighting over the same property).
+- Blink: **the model has no separable eyes**, so the original "scale eyes on
+  Y" approach doesn't work. Options to pick from (judgment call, not
+  mechanically decided yet): (a) skip blinking entirely, simplest, honest
+  deviation; (b) fake it with a tiny dark overlay plane positioned over the
+  eye texture, normally invisible/scaled to ~0, briefly scaled up every 3-5s.
+  Lean toward (a) unless it reads as visually dead without it — try (a)
+  first, see how it looks, upgrade to (b) only if needed.
+- Crown shimmer: **not applicable**, the model has a hat, not a crystal
+  crown. Drop this detail — it was tied to the original (now replaced)
+  design.
+- Sparkles (~120 orbiting points): unaffected by the model swap, build as
+  originally planned — **one `THREE.Points` buffer geometry**, not 120
+  separate entities (draw-call budget).
 
 **Step 3 — throwing (desktop + controllers), pool, trajectory preview: not
 started.** Unaffected by any deviations so far; follow the original spec
@@ -310,5 +310,6 @@ grep check across all authored files before calling this done.
 
 ## Open judgment calls for Vincent (not yet decided)
 
+- Blink: skip entirely, or build the fake-eyelid-overlay hack? (see step 2)
 - Ground is now textured + circular + mirror-tiled and considered settled
   for now; revisit only if Vincent flags something specific about it.

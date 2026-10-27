@@ -103,17 +103,6 @@
       copitoScale: 0.6324,
       copitoOffset: '-4.206 0.0574 3.6008',
 
-      // Idle animation (step 2): bob + sway are added on top of
-      // copitoOffset as deltas on the model wrapper, not the declarative
-      // `animation` component, so later steps (hit-wobble, respawn pop) can
-      // drive the same transform without fighting over it. Periods are
-      // deliberately different (not a shared multiple) so the motion reads
-      // as organic drift rather than a mechanical loop.
-      idleBobAmplitude: 0.02,   // meters, vertical
-      idleBobPeriod: 2.5,       // seconds per full cycle
-      idleSwayAmplitude: 0.035, // radians (~2deg), side-to-side tilt
-      idleSwayPeriod: 3.2,      // seconds per full cycle
-
       // Throwing (step 3)
       throwSpeed: 9,
       throwUpBias: 0.15,
@@ -238,93 +227,6 @@
         this.model.setAttribute('scale', CONFIG.copitoScale + ' ' + CONFIG.copitoScale + ' ' + CONFIG.copitoScale);
         this.model.setAttribute('position', CONFIG.copitoOffset);
         el.appendChild(this.model);
-
-        // Base position for the idle bob/sway below -- read from CONFIG
-        // directly rather than back from the DOM attribute, since the
-        // entity's object3D isn't guaranteed to have applied it yet this
-        // same tick.
-        var offset = CONFIG.copitoOffset.split(' ').map(Number);
-        this.modelBasePosition = { x: offset[0], y: offset[1], z: offset[2] };
-
-        this.buildSparkles();
-      },
-
-      // Idle bob (vertical sine) + slight sway (side-to-side tilt), applied
-      // as deltas on top of the model's corrective offset position. Blink
-      // is intentionally skipped: the model is a single fused mesh with no
-      // separable eyes (see PROGRESS.md step 2), and the bob/sway/sparkles
-      // combo already reads as alive without it.
-      tick: function (time) {
-        var t = time / 1000;
-        var bob = Math.sin((t / CONFIG.idleBobPeriod) * Math.PI * 2) * CONFIG.idleBobAmplitude;
-        var sway = Math.sin((t / CONFIG.idleSwayPeriod) * Math.PI * 2) * CONFIG.idleSwayAmplitude;
-
-        this.model.object3D.position.set(
-          this.modelBasePosition.x,
-          this.modelBasePosition.y + bob,
-          this.modelBasePosition.z
-        );
-        this.model.object3D.rotation.z = sway;
-
-        this.updateSparkles(t);
-      },
-
-      // ~120 orbiting points around Copito's body, one THREE.Points buffer
-      // (not N entities) to keep the draw-call budget flat. Attached to the
-      // outer entity's object3D (ground level under Copito), independent of
-      // the model wrapper's bob/sway above.
-      buildSparkles: function () {
-        var n = CONFIG.idleSparkleCount;
-        var THREE = AFRAME.THREE;
-        var positions = new Float32Array(n * 3);
-
-        this.sparkleAngles = new Float32Array(n);
-        this.sparkleSpeeds = new Float32Array(n);
-        this.sparkleRadii = new Float32Array(n);
-        this.sparkleHeights = new Float32Array(n);
-        this.sparklePhases = new Float32Array(n);
-
-        for (var i = 0; i < n; i++) {
-          this.sparkleAngles[i] = Math.random() * Math.PI * 2;
-          this.sparkleSpeeds[i] = 0.15 + Math.random() * 0.25;
-          this.sparkleRadii[i] = 0.55 + Math.random() * 0.45;
-          this.sparkleHeights[i] = 0.15 + Math.random() * 1.3;
-          this.sparklePhases[i] = Math.random() * Math.PI * 2;
-        }
-
-        var geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-        var material = new THREE.PointsMaterial({
-          color: new THREE.Color(CONFIG.colors.sparkle),
-          size: 0.035,
-          sizeAttenuation: true,
-          transparent: true,
-          opacity: 0.85,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending
-        });
-
-        this.sparkles = new THREE.Points(geometry, material);
-        this.el.object3D.add(this.sparkles);
-        this.updateSparkles(0);
-      },
-
-      updateSparkles: function (t) {
-        var n = CONFIG.idleSparkleCount;
-        var positions = this.sparkles.geometry.attributes.position.array;
-
-        for (var i = 0; i < n; i++) {
-          var angle = this.sparkleAngles[i] + t * this.sparkleSpeeds[i];
-          var radius = this.sparkleRadii[i];
-          var bobOffset = Math.sin(t * 1.5 + this.sparklePhases[i]) * 0.08;
-
-          positions[i * 3] = Math.cos(angle) * radius;
-          positions[i * 3 + 1] = this.sparkleHeights[i] + bobOffset;
-          positions[i * 3 + 2] = Math.sin(angle) * radius;
-        }
-
-        this.sparkles.geometry.attributes.position.needsUpdate = true;
       },
 
       // Paints a soft radial gradient (dark center, transparent edge) once
