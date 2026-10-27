@@ -750,13 +750,91 @@ than the round-2 version, which read as flatter. Root cause and fix:
 
 </details>
 
-**Step 5 — explosion + respawn: not started.** Chunks (40-60): use
-`THREE.InstancedMesh` (two instances — snow lumps, ice shards — already
-agreed during planning, for draw-call budget). Since there are no separate
-"parts" anymore, spawn chunks distributed across the model's overall
-bounding-box height bands instead of at specific part positions — visually
-equivalent. Comfort rule (bias away from player, nothing within 1m of head)
-still applies exactly as specified.
+**Step 5 — explosion + respawn: not started. Prepared brief (branched off
+`step-4-hit-reactions-and-packing`, adapted to that branch's actual hooks —
+see below for why this branch's base matters):**
+
+- **This step needs step 4's not-yet-merged code to exist at all.** Branch
+  `step-5-explosion-respawn` was created off `step-4-hit-reactions-and-packing`
+  (not off `main`) specifically so the explosion logic has something real to
+  hook into — `main` doesn't have `copito`'s hit state machine yet. When step
+  4 merges to `main`, this branch should be rebased onto `main` before it
+  merges itself, so the history ends up linear.
+- **The hook already exists and already fires correctly:** `copito.onHit`
+  (`index.html` around line 969) emits `snowman-destroyed` on `#copito` with
+  `{point}` in the detail once `hitCount` reaches `CONFIG.hitsToExplode`, then
+  immediately resets `hitCount` to 0 and hides the crack decals — explicitly
+  a placeholder ("hands off to step 5... swap this reset for the real
+  explosion when step 5 lands"). This step's job: listen for
+  `snowman-destroyed` and do the real thing instead of that bare reset. Don't
+  remove the reset logic itself, just move it to fire when respawn completes
+  rather than the instant the event fires.
+- **Multi-snowman already works, use it, don't re-solve it.** `copitoRegistry`
+  (module-level array, every live `copito` instance pushes/splices itself in
+  `init`/`remove`) already exists because step 4 future-proofed hit detection
+  for multiple snowmen on the map. Only one `<a-entity id="copito" copito>`
+  is actually placed today, but the explosion/respawn component should still
+  be written per-instance (e.g. a new component on the same `copito` entity,
+  or a sibling the `copito` component creates for itself) rather than
+  assuming a single global `#copito` — otherwise this becomes the thing that
+  has to be reworked when a second snowman is placed, the exact trap step 4
+  avoided for hit detection.
+- **Hiding Copito**: `this.model` (the gltf wrapper) and `this.hitPivot` (its
+  parent, see `CONFIG.hitPivotHeight`'s comment) are both on the `copito`
+  component instance already. Hide the whole `hitPivot` subtree
+  (`setAttribute('visible', false)`) rather than touching `model` alone, so
+  the blob shadow... actually check: the shadow plane is a sibling of
+  `hitPivot` under `el`, not inside it (see `init`) — it'll need its own
+  hide/show alongside `hitPivot`, or Copito's shadow will sit there alone
+  while he's exploded. Easy to miss, verify visually.
+- **Chunk spawn positions**: no separate "parts" exist on this fused mesh
+  (same constraint as steps 2 and 4), so distribute chunks across the
+  model's bounding-box height bands using `CONFIG.snowmanHeight` (1.6) and
+  the snowman's world position, not per-part anchors. `CONFIG.chunkCount`
+  (50, already in `CONFIG`, mid-range of the spec's 40-60) is set; still
+  needed: the actual chunk entity setup. Use `THREE.InstancedMesh`, two
+  instances (snow lumps = low-poly icosphere, ice shards = octahedron) for
+  the draw-call budget, matching the plan agreed earlier and the pooling
+  pattern already used for snowballs/sparkles/snow-puffs elsewhere in this
+  file (build once, reuse, no per-explosion allocation).
+- **Chunk physics**: outward velocity `CONFIG.chunkSpeedMin`–`chunkSpeedMax`
+  (2–5, already in `CONFIG`) with an upward kick, random spin, gravity,
+  bounce once at `y = 0` with damping, then shrink + fade over 1.5s (not yet
+  a `CONFIG` value — add one, e.g. `chunkFadeDuration`). **Comfort rule is
+  load-bearing, not a nice-to-have**: bias every chunk's horizontal velocity
+  away from the camera/player position (reject or re-roll any direction with
+  a strong component toward the camera) and clamp so nothing can pass within
+  1m of the head — this is a VR-comfort requirement from the original spec,
+  test it by checking actual chunk trajectories against camera position in
+  the browser, not just by eye.
+- **Sparkle burst + light flash**: `CONFIG.explosionSparkleCount` (250,
+  already in `CONFIG`) additive points expanding then fading over ~1s —
+  same `THREE.Points` pattern as `buildSparkles`/`buildSnowPuffs`, one more
+  pooled system, not a new architecture. Point light intensity spike for
+  150ms at the snowman's position (no full-screen flash, per spec).
+- **Haptics + sound**: `CONFIG.haptics.explosion` (`[1.0, 150]`) is already
+  defined and just needs to be fired on explosion, same
+  `hapticActuators[0].pulse()` guard pattern already used for throw/hit.
+  Shatter/chime sounds are step 6's job (no audio wired up anywhere yet) —
+  leave hooks/comments for where they'll attach, don't block on them.
+- **Respawn**: after `CONFIG.respawnDelay` (2.5s, already in `CONFIG`),
+  scale the `hitPivot` (or `model`, decide based on which reads better once
+  built) from 0 to 1 with an overshoot "pop" over 0.6s — a new
+  `CONFIG.respawnPopDuration`-style value, not yet added. This is the point
+  where `hitCount` actually should reset to 0 (move the existing reset from
+  `onHit` to here) and the shadow/model/hitPivot visibility should flip back
+  on together.
+- **"Destroyed" counter**: the original spec wants a running "snowmen
+  destroyed" count shown in step 7's HUD. No counter variable exists
+  anywhere yet — this step should own incrementing one (module-level, or per
+  `copito` instance, mirroring the registry decision above) on respawn
+  completion, even though nothing displays it until step 7. Don't build the
+  HUD display here, just don't lose the count.
+- **Not yet tested on an actual Quest 2 headset** — same outstanding item as
+  every step since step 3; this step adds the comfort-rule check (nothing
+  within 1m of the player's head) to that list, which specifically needs a
+  headset or at minimum a desktop camera-position check, not just a visual
+  read.
 
 **Step 6 — sound + haptics: not started.** Same access problem as the sky
 image is likely for Kenney/Freesound — Vincent will probably need to
