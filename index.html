@@ -22,7 +22,8 @@
     licensed <a href="http://creativecommons.org/licenses/by/4.0/" style="color:inherit">CC-BY-4.0</a>
   </div>
   <a-scene renderer="antialias: true; colorManagement: true; foveationLevel: 1"
-           fog="type: linear; color: #aab0b8; near: 4.5; far: 7.9">
+           fog="type: linear; color: #aab0b8; near: 4.5; far: 7.9"
+           snowball-thrower>
     <!--
       antialias: smooths jagged edges, cheap enough on Quest 2 at this triangle budget.
       colorManagement: keeps colors consistent between the sRGB textures (sky photo) and
@@ -83,7 +84,20 @@
 
     <a-entity id="copito" copito position="0 0 -5"></a-entity>
 
-    <a-entity camera position="0 1.6 0" look-controls wasd-controls></a-entity>
+    <!-- Step 3: hand controllers for Quest, snowball pool + ballistic throw,
+         and a per-source dotted aim arc. meta-touch-controls is the current
+         A-Frame 1.7.0 component name for Quest Touch controllers (confirmed
+         by grepping vendor/aframe.min.js -- oculus-touch-controls also
+         exists as an older alias, same implementation). No laser-controls
+         anywhere: see hide-controller-line below for why that alone isn't
+         enough to keep the beam off. -->
+    <a-entity id="leftHand" meta-touch-controls="hand: left" hide-controller-line
+              trajectory-preview="source: hand"></a-entity>
+    <a-entity id="rightHand" meta-touch-controls="hand: right" hide-controller-line
+              trajectory-preview="source: hand"></a-entity>
+
+    <a-entity camera position="0 1.6 0" look-controls wasd-controls
+              trajectory-preview="source: desktop"></a-entity>
   </a-scene>
 
   <script>
@@ -121,8 +135,15 @@
       throwCooldown: 0.25,
       maxSnowballs: 12,
       snowballLifetime: 3,
+      snowballRadius: 0.08,
+      // "Hit" is a proximity check against Copito's position, not real
+      // collision geometry (step 3's event contract note: the model is one
+      // fused mesh, so there are no separate part hitboxes). Generous on
+      // purpose so aiming slightly off still reads as a hit.
+      snowballHitRadius: 0.5,
       showTrajectory: true,
       trajectoryDots: 12,
+      trajectoryDotInterval: 0.08, // seconds of flight time between dots
 
       // Hits and explosion (steps 4-5)
       hitsToExplode: 3,
@@ -160,7 +181,8 @@
         tealStripe: '#0F766E',
         iceNose: '#2EC4B6',
         crownCyan: '#7DF9FF',
-        sparkle: '#B8FFF4'
+        sparkle: '#B8FFF4',
+        snowball: '#F4FFFD'
       }
     };
 
@@ -181,6 +203,298 @@
         destroyed: 'Snowmen destroyed'
       }
     };
+
+    // ---------------------------------------------------------------------
+    // DesktopAim: live mouse position in normalized device coordinates
+    // (-1 to 1), shared by snowball-thrower (desktop throw direction) and
+    // trajectory-preview (desktop arc). A plain object with one listener,
+    // not a component, since nothing here is tied to a specific entity.
+    // ---------------------------------------------------------------------
+    var DesktopAim = { x: 0, y: 0 };
+    window.addEventListener('mousemove', function (evt) {
+      DesktopAim.x = (evt.clientX / window.innerWidth) * 2 - 1;
+      DesktopAim.y = -(evt.clientY / window.innerHeight) * 2 + 1;
+    });
+
+    // ---------------------------------------------------------------------
+    // hide-controller-line: meta-touch-controls (like every vendor
+    // touch-controls component) auto-attaches its own raycaster with
+    // showLine:true as soon as a controller connects -- confirmed by
+    // grepping vendor/aframe.min.js (its internal per-vendor mapping merges
+    // `{showLine: true}` as the default), not assumed from memory, per the
+    // step 1 lesson. The dotted trajectory arc is the only aim visual this
+    // demo wants (it shows the real gravity drop, a straight laser doesn't,
+    // and the original spec's own note says to keep hello_quest's laser
+    // hidden since it fights with the arc), so this flips the
+    // auto-added line back off every time the library turns it on.
+    // ---------------------------------------------------------------------
+    AFRAME.registerComponent('hide-controller-line', {
+      init: function () {
+        var hide = () => this.el.setAttribute('raycaster', 'showLine', false);
+        this.el.addEventListener('controllerconnected', hide);
+        this.el.addEventListener('controllermodelready', hide);
+      }
+    });
+
+    // ---------------------------------------------------------------------
+    // snowball-thrower: lives on <a-scene>. Owns the pooled snowball
+    // entities, listens for throw input from both hands and the desktop
+    // mouse, and runs the shared ballistic tick for every live snowball.
+    // One pool, pre-created once and reused by round-robin index, per the
+    // no-create/destroy-per-throw budget.
+    // ---------------------------------------------------------------------
+    AFRAME.registerComponent('snowball-thrower', {
+      init: function () {
+        var THREE = AFRAME.THREE;
+        this.lastTickTime = 0;
+        this.cooldownUntil = {}; // per source key ('left'/'right'/'desktop')
+        this.scratchOrigin = new THREE.Vector3();
+        this.scratchDir = new THREE.Vector3();
+        this.scratchCopitoPos = new THREE.Vector3();
+        this.raycaster = new THREE.Raycaster();
+
+        this.buildPool();
+
+        this.copito = this.el.querySelector('#copito');
+        this.leftHand = this.el.querySelector('#leftHand');
+        this.rightHand = this.el.querySelector('#rightHand');
+
+        this.leftHand.addEventListener('triggerdown', () => this.throwFromHand(this.leftHand, 'left'));
+        this.rightHand.addEventListener('triggerdown', () => this.throwFromHand(this.rightHand, 'right'));
+
+        // this.el.canvas only exists once the scene has finished loading.
+        if (this.el.hasLoaded) {
+          this.attachDesktopInput();
+        } else {
+          this.el.addEventListener('loaded', () => this.attachDesktopInput());
+        }
+      },
+
+      attachDesktopInput: function () {
+        this.el.canvas.addEventListener('mousedown', () => this.throwFromDesktop());
+      },
+
+      buildPool: function () {
+        var THREE = AFRAME.THREE;
+        this.pool = [];
+        this.nextIndex = 0;
+        for (var i = 0; i < CONFIG.maxSnowballs; i++) {
+          var el = document.createElement('a-sphere');
+          el.setAttribute('radius', CONFIG.snowballRadius);
+          el.setAttribute('segments-width', 8);
+          el.setAttribute('segments-height', 8);
+          el.setAttribute('material', 'color: ' + CONFIG.colors.snowball + '; roughness: 0.6; metalness: 0');
+          el.setAttribute('visible', false);
+          this.el.appendChild(el);
+          this.pool.push({ el: el, active: false, velocity: new THREE.Vector3(), spawnTime: 0 });
+        }
+      },
+
+      throwFromHand: function (handEl, sourceKey) {
+        if (!this.canThrow(sourceKey)) return;
+        handEl.object3D.getWorldPosition(this.scratchOrigin);
+        handEl.object3D.getWorldDirection(this.scratchDir);
+        this.spawn(this.scratchOrigin, this.scratchDir);
+        this.pulseHaptics(handEl, CONFIG.haptics.throw[0], CONFIG.haptics.throw[1]);
+      },
+
+      throwFromDesktop: function () {
+        if (!this.canThrow('desktop')) return;
+        var camera = this.el.camera;
+        if (!camera) return;
+        this.raycaster.setFromCamera({ x: DesktopAim.x, y: DesktopAim.y }, camera);
+        this.spawn(this.raycaster.ray.origin, this.raycaster.ray.direction);
+      },
+
+      canThrow: function (sourceKey) {
+        var now = this.lastTickTime;
+        if (this.cooldownUntil[sourceKey] !== undefined && now < this.cooldownUntil[sourceKey]) return false;
+        this.cooldownUntil[sourceKey] = now + CONFIG.throwCooldown * 1000;
+        return true;
+      },
+
+      spawn: function (origin, direction) {
+        var sb = this.pool[this.nextIndex];
+        this.nextIndex = (this.nextIndex + 1) % this.pool.length;
+
+        sb.active = true;
+        sb.spawnTime = this.lastTickTime;
+        sb.el.object3D.position.copy(origin);
+        sb.el.object3D.visible = true;
+
+        sb.velocity.copy(direction).normalize().multiplyScalar(CONFIG.throwSpeed);
+        sb.velocity.y += CONFIG.throwUpBias;
+      },
+
+      deactivate: function (sb) {
+        sb.active = false;
+        sb.el.object3D.visible = false;
+      },
+
+      pulseHaptics: function (handEl, intensity, durationMs) {
+        var tracked = handEl.components['tracked-controls'];
+        var gamepad = tracked && tracked.controller && tracked.controller.gamepad;
+        var actuator = gamepad && gamepad.hapticActuators && gamepad.hapticActuators[0];
+        if (actuator) actuator.pulse(intensity, durationMs);
+      },
+
+      // Ballistic update for every live snowball (Euler integration, scratch
+      // vectors reused, no per-frame allocation) + the proximity "hit"
+      // check against Copito that hands off to step 4 via the
+      // `snowball-hit` DOM event (step 4 just adds the listener).
+      tick: function (time, delta) {
+        this.lastTickTime = time;
+        var dt = Math.min(delta / 1000, 0.05);
+
+        this.copito.object3D.getWorldPosition(this.scratchCopitoPos);
+
+        for (var i = 0; i < this.pool.length; i++) {
+          var sb = this.pool[i];
+          if (!sb.active) continue;
+
+          sb.velocity.y -= CONFIG.gravity * dt;
+          sb.el.object3D.position.addScaledVector(sb.velocity, dt);
+
+          var pos = sb.el.object3D.position;
+          if (pos.distanceTo(this.scratchCopitoPos) <= CONFIG.snowballHitRadius) {
+            this.copito.emit('snowball-hit', { point: { x: pos.x, y: pos.y, z: pos.z } });
+            this.deactivate(sb);
+            continue;
+          }
+
+          if ((time - sb.spawnTime) / 1000 > CONFIG.snowballLifetime) {
+            this.deactivate(sb);
+          }
+        }
+      }
+    });
+
+    // ---------------------------------------------------------------------
+    // circleSpriteTexture: a small soft-edged white circle, painted once on
+    // a canvas and shared by every trajectory-preview instance. WebGL point
+    // sprites render as plain squares unless given a `map` texture (with
+    // alphaTest to cut out the corners) -- this is that texture, round
+    // instead of square.
+    // ---------------------------------------------------------------------
+    var circleSpriteTexture = null;
+    function getCircleSpriteTexture() {
+      if (circleSpriteTexture) return circleSpriteTexture;
+      var canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 64;
+      var ctx = canvas.getContext('2d');
+      var gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 30);
+      gradient.addColorStop(0, 'rgba(255,255,255,1)');
+      gradient.addColorStop(0.7, 'rgba(255,255,255,0.9)');
+      gradient.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 64, 64);
+      circleSpriteTexture = new AFRAME.THREE.CanvasTexture(canvas);
+      return circleSpriteTexture;
+    }
+
+    // ---------------------------------------------------------------------
+    // trajectory-preview: one dotted arc per aim source (each hand entity,
+    // plus one on the camera for desktop). Dot positions come from the same
+    // ballistic formula snowball-thrower uses, so the preview actually
+    // matches where a thrown snowball will go. Hidden while that source's
+    // trigger/mouse button is held down.
+    // ---------------------------------------------------------------------
+    AFRAME.registerComponent('trajectory-preview', {
+      schema: { source: { default: 'hand' } }, // 'hand' or 'desktop'
+
+      init: function () {
+        var THREE = AFRAME.THREE;
+        this.held = false;
+        this.scratchOrigin = new THREE.Vector3();
+        this.scratchDir = new THREE.Vector3();
+        this.raycaster = new THREE.Raycaster();
+
+        var n = CONFIG.trajectoryDots;
+        var geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+
+        this.points = new THREE.Points(geometry, new THREE.PointsMaterial({
+          color: new THREE.Color(CONFIG.colors.snowball),
+          size: 0.055,
+          sizeAttenuation: true,
+          map: getCircleSpriteTexture(),
+          alphaTest: 0.1, // discards the texture's transparent corners instead of just blending them, so depthWrite can stay accurate
+          transparent: true,
+          opacity: 0.9,
+          depthWrite: false
+        }));
+        // A thin line through the same dots so the arc reads as one curve,
+        // not a scatter of separate points. Shares the Points' geometry
+        // (same position attribute, one update moves both) rather than
+        // duplicating the buffer.
+        this.line = new THREE.Line(geometry, new THREE.LineBasicMaterial({
+          color: new THREE.Color(CONFIG.colors.snowball),
+          transparent: true,
+          opacity: 0.35,
+          depthWrite: false
+        }));
+        // World-space points/line: positions below are computed in world
+        // space directly, so these attach to the scene root rather than
+        // `el`, independent of the aim source's own transform.
+        this.el.sceneEl.object3D.add(this.points);
+        this.el.sceneEl.object3D.add(this.line);
+
+        if (this.data.source === 'hand') {
+          this.el.addEventListener('triggerdown', () => { this.held = true; });
+          this.el.addEventListener('triggerup', () => { this.held = false; });
+        } else {
+          var attach = () => {
+            this.el.sceneEl.canvas.addEventListener('mousedown', () => { this.held = true; });
+            this.el.sceneEl.canvas.addEventListener('mouseup', () => { this.held = false; });
+          };
+          if (this.el.sceneEl.hasLoaded) attach();
+          else this.el.sceneEl.addEventListener('loaded', attach);
+        }
+      },
+
+      tick: function () {
+        var hideForVR = this.data.source === 'desktop' && this.el.sceneEl.is('vr-mode');
+        if (!CONFIG.showTrajectory || this.held || hideForVR) {
+          this.setVisible(false);
+          return;
+        }
+
+        if (this.data.source === 'hand') {
+          this.el.object3D.getWorldPosition(this.scratchOrigin);
+          this.el.object3D.getWorldDirection(this.scratchDir);
+        } else {
+          var camera = this.el.sceneEl.camera;
+          if (!camera) { this.setVisible(false); return; }
+          this.raycaster.setFromCamera({ x: DesktopAim.x, y: DesktopAim.y }, camera);
+          this.scratchOrigin.copy(this.raycaster.ray.origin);
+          this.scratchDir.copy(this.raycaster.ray.direction);
+        }
+
+        this.setVisible(true);
+        this.updateDots();
+      },
+
+      setVisible: function (visible) {
+        this.points.visible = visible;
+        this.line.visible = visible;
+      },
+
+      updateDots: function () {
+        var positions = this.points.geometry.attributes.position.array;
+        var vx = this.scratchDir.x * CONFIG.throwSpeed;
+        var vy = this.scratchDir.y * CONFIG.throwSpeed + CONFIG.throwUpBias;
+        var vz = this.scratchDir.z * CONFIG.throwSpeed;
+
+        for (var i = 0; i < CONFIG.trajectoryDots; i++) {
+          var t = (i + 1) * CONFIG.trajectoryDotInterval;
+          positions[i * 3] = this.scratchOrigin.x + vx * t;
+          positions[i * 3 + 1] = this.scratchOrigin.y + vy * t - 0.5 * CONFIG.gravity * t * t;
+          positions[i * 3 + 2] = this.scratchOrigin.z + vz * t;
+        }
+
+        this.points.geometry.attributes.position.needsUpdate = true;
+      }
+    });
 
     // ---------------------------------------------------------------------
     // mirror-tile: makes a repeated ground texture seamless. A-Frame's
