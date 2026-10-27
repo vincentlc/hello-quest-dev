@@ -1,0 +1,313 @@
+{
+  "accessors": [
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 5459,
+      "max": [
+        2.53825044631958,
+        1.2640775442123413,
+        4.5655598640441895
+      ],
+      "min": [
+        -2.372326612472534,
+        -1.5737905502319336,
+        -0.1307302713394165
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 65508,
+      "componentType": 5126,
+      "count": 5459,
+      "max": [
+        0.9999859929084778,
+        0.9999948143959045,
+        0.9997573494911194
+      ],
+      "min": [
+        -0.9999316334724426,
+        -0.9999547004699707,
+        -0.9999909996986389
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 5459,
+      "max": [
+        0.9998902678489685,
+        0.9998775720596313,
+        0.9998922944068909,
+        1.0
+      ],
+      "min": [
+        -0.9989873170852661,
+        -0.9995334148406982,
+        -0.9998750686645508,
+        -1.0
+      ],
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 5459,
+      "max": [
+        0.9999206066131592,
+        0.9957855939865112
+      ],
+      "min": [
+        7.936252222862095e-05,
+        7.936252222862095e-05
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 43672,
+      "componentType": 5126,
+      "count": 5459,
+      "max": [
+        0.542052149772644,
+        1.7625386714935303
+      ],
+      "min": [
+        0.0,
+        0.0
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "componentType": 5125,
+      "count": 26676,
+      "type": "SCALAR"
+    }
+  ],
+  "asset": {
+    "extras": {
+      "author": "alixor22 (https://sketchfab.com/alixor22)",
+      "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "source": "https://sketchfab.com/3d-models/snowman-7d683ce4a9c54f158cc73d65a16a9a29",
+      "title": "Snowman"
+    },
+    "generator": "Sketchfab-15.12.0",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 106704,
+      "name": "floatBufferViews",
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 87344,
+      "byteOffset": 106704,
+      "byteStride": 8,
+      "name": "floatBufferViews",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 131016,
+      "byteOffset": 194048,
+      "byteStride": 12,
+      "name": "floatBufferViews",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 87344,
+      "byteOffset": 325064,
+      "byteStride": 16,
+      "name": "floatBufferViews",
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 412408,
+      "uri": "scene.bin"
+    }
+  ],
+  "extensionsUsed": [
+    "KHR_materials_specular"
+  ],
+  "images": [
+    {
+      "uri": "textures/mueco_de_nieve_baseColor.jpeg"
+    },
+    {
+      "uri": "textures/mueco_de_nieve_metallicRoughness.png"
+    },
+    {
+      "uri": "textures/mueco_de_nieve_normal.png"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 0.11428606258609549
+        }
+      },
+      "name": "mueco_de_nieve",
+      "normalTexture": {
+        "index": 2
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 1
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "mu��ecop de nieve_mu��eco de nieve_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 1,
+            "POSITION": 0,
+            "TANGENT": 2,
+            "TEXCOORD_0": 3,
+            "TEXCOORD_1": 4
+          },
+          "indices": 5,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "children": [
+        1
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        2.220446049250313e-16,
+        -1.0,
+        0.0,
+        0.0,
+        1.0,
+        2.220446049250313e-16,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Sketchfab_model"
+    },
+    {
+      "children": [
+        2
+      ],
+      "matrix": [
+        0.009999999776482582,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.009999999776482582,
+        0.0,
+        0.0,
+        -0.009999999776482582,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "39369b82b7c0407eb4d9b8814b86d8bd.fbx"
+    },
+    {
+      "children": [
+        3
+      ],
+      "name": "RootNode"
+    },
+    {
+      "children": [
+        4
+      ],
+      "matrix": [
+        53.87417221069336,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -8.777216738238685e-06,
+        -53.87417221069265,
+        0.0,
+        0.0,
+        53.87417221069265,
+        -8.777216738238685e-06,
+        0.0,
+        660.6368408203125,
+        -2.031726360321045,
+        -577.732177734375,
+        1.0
+      ],
+      "name": "mu��ecop de nieve"
+    },
+    {
+      "mesh": 0,
+      "name": "mu��ecop de nieve_mu��eco de nieve_0"
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Sketchfab_Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    }
+  ]
+}
