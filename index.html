@@ -167,13 +167,15 @@
       landedSquashTime: 0.12, // seconds to ease into the squashed shape
 
       // Hits and explosion (steps 4-5). hitsToExplode is the snowman's
-      // "lives": one crack appears per hit up to the last one (which
-      // explodes instead), so more lives = more cracks, generated
-      // procedurally (see generateCrackPositions) rather than hand-placed.
-      // Default 3 (2 cracks); designed to go up to 7 (6 cracks) later for a
-      // bigger snowman variant -- that bigger-body/bigger-count variant
-      // itself isn't built yet, this just keeps the hit/crack system from
-      // hard-coding "exactly 2" so raising this number alone will work.
+      // "type"/lives, and is only ever 1, 3, 5, or 7 (see CRACK_MASTER_ORDER
+      // and getCrackSlotsForLives below for why those specific values and
+      // not any integer). One crack appears per hit up to the last one
+      // (which explodes instead): type 1 explodes on the first hit with no
+      // crack at all, type 3 shows 2 cracks, type 5 shows 4, type 7 shows
+      // all 6. Default 3; designed to go up to 7 later for a bigger
+      // snowman variant -- that bigger-body variant itself isn't built yet,
+      // this just keeps the hit/crack system from hard-coding "exactly 2"
+      // so raising this number alone will work.
       hitsToExplode: 3,
       chunkCount: 50,
       chunkSpeedMin: 2,
@@ -198,15 +200,17 @@
       snowPuffSpeed: 1.3,
       snowPuffLifetime: 0.45,
 
-      // Crack decals (step 4): one shown per hit, up to hitsToExplode - 1 of
-      // them (the final hit explodes instead of cracking). Positions come
-      // from generateCrackPositions(count), not a hand-written list, so the
-      // count tracks hitsToExplode automatically. Authored in Copito's own
-      // el-local meters (same frame as copitoOffset), converted to the
-      // model's raw/pre-scale space at build time (see
-      // copito.worldToModelLocal) so each decal can be parented inside the
-      // model wrapper and inherit every animation (bob/sway/squash/wobble)
-      // for free, instead of drifting separately.
+      // Crack decals (step 4): per Vincent's reference sketch, every active
+      // crack crosses through the same central point on the torso (not
+      // spread to different spots) -- see CRACK_MASTER_ORDER/CRACK_SLOTS
+      // for the fixed per-slot colors and crossing angles, and
+      // getCrackSlotsForLives for which slots a given hitsToExplode shows.
+      // crackCenter is in Copito's own el-local meters (same frame as
+      // copitoOffset), converted to the model's raw/pre-scale space at
+      // build time (see copito.worldToModelLocal) so each decal can be
+      // parented inside the model wrapper and inherit every animation
+      // (bob/sway/squash/wobble) for free, instead of drifting separately.
+      crackCenter: { x: 0, y: 0.82, z: 0.22 },
       crackSize: 0.75, // big enough to read as a real fracture across the torso, not a small nick
 
       // Hit squash/wobble (step 4) rotate/scale around this point instead
@@ -247,12 +251,7 @@
         iceNose: '#2EC4B6',
         crownCyan: '#7DF9FF',
         sparkle: '#B8FFF4',
-        snowball: '#F4FFFD',
-        // Crack decal (step 4): dark fracture line + a bright icy glow/
-        // highlight for contrast against the pale body, staying in the
-        // existing cold teal/cyan palette rather than an off-theme red.
-        crackLine: '#0A2A28',
-        crackGlow: '#7DF9FF'
+        snowball: '#F4FFFD'
       }
     };
 
@@ -601,48 +600,42 @@
     var copitoInstanceCounter = 0; // unique id source for per-instance asset ids, see copito.init
 
     // ---------------------------------------------------------------------
-    // generateCrackPositions: one crack decal per hit up to hitsToExplode-1
-    // (see CONFIG's comment), spread across a front-facing arc that widens
-    // as more cracks need to fit so they stay individually legible instead
-    // of piling on top of each other. Pure function of `count` -- no
-    // per-instance state -- so every snowman (when there's more than one,
-    // later) gets the same procedural layout. Returns positions in the
-    // el-local meters frame (same as copitoOffset).
+    // CRACK_MASTER_ORDER / CRACK_SLOTS / getCrackSlotsForLives: Vincent's
+    // reference sketch -- six possible crack "slots", each a fixed color
+    // and fixed crossing angle, all crossing through the same central point
+    // on the torso (not spread to different spots). A snowman's type
+    // (CONFIG.hitsToExplode: 1, 3, 5, or 7 lives -- no other value makes
+    // sense here) determines how many of those six are active, and they're
+    // always a SUFFIX of this one master order, not an arbitrary subset:
+    // slots 1/2 (red/amber) are always the final pair shown right before
+    // death, 3/4 (pink/green) are added before that for type 5+, and 6/7
+    // (blue) are added before even those for type 7. So a tougher snowman
+    // gets earlier cracks prepended, never new ones appended at the end --
+    // "dies right after cracking 1,2" stays true for every type that has
+    // them. `angle` is in degrees, used by makeCrackTexture to draw each
+    // slot's curve sweeping through the shared center at a different tilt
+    // (steepest/most-central for 1/2, widest for 6/7), so several active
+    // slots read as one crossing pattern, like the sketch, rather than
+    // needing separate plane positions per slot.
     // ---------------------------------------------------------------------
-    function generateCrackPositions(count) {
-      var positions = [];
-      if (count <= 0) return positions;
-      // 58deg matches the original hand-placed two-crack look; widening per
-      // extra crack keeps the per-crack spacing roughly constant instead of
-      // cramming more and more into the same fixed arc.
-      var arc = Math.min(260, 58 + (count - 2) * 42);
-      var startAngle = -arc / 2;
-      for (var i = 0; i < count; i++) {
-        var t = count > 1 ? i / (count - 1) : 0.5;
-        var angle = startAngle + t * arc;
-        var rad = angle * Math.PI / 180;
-        positions.push({
-          x: Math.sin(rad) * 0.16,
-          y: 0.85 - (i % 3) * 0.1, // slight vertical variety once there are more than a couple
-          z: Math.cos(rad) * 0.1 + 0.14,
-          rotationY: angle
-        });
-      }
-      return positions;
-    }
+    var CRACK_MASTER_ORDER = [6, 7, 3, 4, 1, 2];
+    var CRACK_SLOTS = {
+      1: { angle: -20, core: '#A32D2D', glow: '#E24B4A' }, // red
+      2: { angle: 20, core: '#854F0B', glow: '#EF9F27' },  // amber
+      3: { angle: -45, core: '#72243E', glow: '#D4537E' }, // pink
+      4: { angle: 45, core: '#27500A', glow: '#97C459' },  // green
+      6: { angle: -70, core: '#0C447C', glow: '#378ADD' }, // blue
+      7: { angle: 70, core: '#042C53', glow: '#85B7EB' }   // blue, darker
+    };
 
-    // ---------------------------------------------------------------------
-    // mulberry32: tiny seeded PRNG (one multiply-heavy 32-bit step), used
-    // only so each crack decal texture gets a distinct-but-reproducible
-    // branch pattern instead of each page load drawing something new.
-    // ---------------------------------------------------------------------
-    function mulberry32(seed) {
-      return function () {
-        seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
-        var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-      };
+    function getCrackSlotsForLives(lives) {
+      // Snaps to the nearest valid type (1/3/5/7) instead of silently
+      // producing a broken partial set (e.g. lives=4 would otherwise cut a
+      // pair in half) if CONFIG is ever set to something else by mistake.
+      var valid = [1, 3, 5, 7];
+      var snapped = valid.reduce((a, b) => Math.abs(b - lives) < Math.abs(a - lives) ? b : a);
+      var count = Math.max(0, snapped - 1);
+      return CRACK_MASTER_ORDER.slice(CRACK_MASTER_ORDER.length - count);
     }
 
     // ---------------------------------------------------------------------
@@ -1070,51 +1063,58 @@
         if (!anyAlive) this.snowPuffs.visible = false;
       },
 
-      // One decal per hit leading up to the explosion (count =
-      // hitsToExplode - 1, see CONFIG's comment), built once hidden and
-      // just toggled visible as hitCount climbs / on reset, rather than
-      // created and torn down each time. Positions come from
-      // generateCrackPositions, not a hand-written list, so raising
-      // hitsToExplode alone grows the set. Parented inside `this.model`
-      // (not `this.el`) so they move with every body animation -- see
-      // worldToModelLocal's comment for why that's what actually keeps
-      // them glued to Copito.
+      // One decal per active slot for this snowman's type
+      // (getCrackSlotsForLives(CONFIG.hitsToExplode)), built once hidden
+      // and just toggled visible as hitCount climbs / on reset, rather
+      // than created and torn down each time. All of them share the same
+      // position (CONFIG.crackCenter, nudged a hair apart in z per slot
+      // only to avoid z-fighting between coplanar decals) -- per Vincent's
+      // reference sketch, every crack crosses through the same central
+      // point, with only its drawn angle and color (CRACK_SLOTS) telling
+      // them apart, not separate spots on the body. Parented inside
+      // `this.model` (not `this.el`) so they move with every body
+      // animation -- see worldToModelLocal's comment for why that's what
+      // actually keeps them glued to Copito.
       buildCrackDecals: function () {
-        var positions = generateCrackPositions(Math.max(0, CONFIG.hitsToExplode - 1));
-        this.crackDecals = positions.map((cfg, i) => this.buildCrackDecal(cfg, i));
+        this.activeCrackSlots = getCrackSlotsForLives(CONFIG.hitsToExplode);
+        this.crackDecals = this.activeCrackSlots.map((slotKey, i) => this.buildCrackDecal(slotKey, i));
       },
 
-      buildCrackDecal: function (cfg, index) {
-        var img = this.makeCrackTexture(index);
+      buildCrackDecal: function (slotKey, index) {
+        var img = this.makeCrackTexture(slotKey);
         this.el.sceneEl.querySelector('a-assets').appendChild(img);
 
-        var localPos = this.worldToModelLocal(cfg);
+        var center = CONFIG.crackCenter;
+        var localPos = this.worldToModelLocal({
+          x: center.x, y: center.y, z: center.z + index * 0.002
+        });
         var localSize = CONFIG.crackSize / CONFIG.copitoScale;
 
         var decal = document.createElement('a-plane');
         decal.setAttribute('width', localSize);
         decal.setAttribute('height', localSize);
         decal.setAttribute('position', localPos.x + ' ' + localPos.y + ' ' + localPos.z);
-        decal.setAttribute('rotation', '0 ' + cfg.rotationY + ' 0');
         decal.setAttribute('material', 'src: #' + img.id + '; transparent: true; shader: flat; side: double; alphaTest: 0.02');
         decal.setAttribute('visible', false);
         this.model.appendChild(decal);
         return decal;
       },
 
-      // A jagged, tapered, branching fracture (not just straight lines) with
-      // a soft glow halo behind it for contrast against the pale body, plus
-      // a thin bright highlight riding each line for a "catching the light"
-      // sparkle. Icy teal/cyan (CONFIG.colors.crackLine/crackGlow), not red
-      // -- red reads as a wound, which fights the cute-snowman tone; the
-      // glow+outline contrast carries the visibility instead. `seed` picks
-      // a stable-but-distinct random pattern per decal so neighboring
-      // cracks look different, not copies of each other. The glow is kept
-      // fairly tight around the lines on purpose -- with several decals
-      // placed close together (more hitsToExplode = more, closer cracks),
-      // an overly wide halo on each one bleeds into its neighbors and the
-      // individual fractures stop reading as distinct.
-      makeCrackTexture: function (seed) {
+      // A single smooth curved sweep through the shared center (a
+      // quadratic bezier, gently bulging to read as wrapping the body's
+      // roundness), not the earlier jagged branching fracture -- per
+      // Vincent's reference sketch and his confirmation that this curved
+      // style read well. A soft glow halo behind it keeps it visible
+      // against the pale body; a bright highlight riding alongside gives
+      // it a "catching the light" sparkle. Colors and crossing angle come
+      // from CRACK_SLOTS[slotKey] -- fixed per slot, not randomized, so
+      // the same slot always looks the same regardless of which other
+      // slots happen to be active for a given snowman type. The glow is
+      // kept fairly tight around the line on purpose: with several slots
+      // crossing through the same point (tougher types), a wide halo on
+      // each one would bleed together into one undifferentiated blob.
+      makeCrackTexture: function (slotKey) {
+        var slot = CRACK_SLOTS[slotKey];
         var size = 256;
         var canvas = document.createElement('canvas');
         canvas.width = canvas.height = size;
@@ -1122,68 +1122,41 @@
         var cx = size / 2, cy = size / 2;
 
         var outerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.3);
-        outerGlow.addColorStop(0, CONFIG.colors.crackGlow + '55');
-        outerGlow.addColorStop(0.6, CONFIG.colors.crackGlow + '22');
-        outerGlow.addColorStop(1, CONFIG.colors.crackGlow + '00');
+        outerGlow.addColorStop(0, slot.glow + '55');
+        outerGlow.addColorStop(0.6, slot.glow + '22');
+        outerGlow.addColorStop(1, slot.glow + '00');
         ctx.fillStyle = outerGlow;
         ctx.fillRect(0, 0, size, size);
 
         var coreGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.13);
-        coreGlow.addColorStop(0, CONFIG.colors.crackGlow + 'AA');
-        coreGlow.addColorStop(1, CONFIG.colors.crackGlow + '00');
+        coreGlow.addColorStop(0, slot.glow + 'AA');
+        coreGlow.addColorStop(1, slot.glow + '00');
         ctx.fillStyle = coreGlow;
         ctx.fillRect(0, 0, size, size);
 
-        var rand = mulberry32(seed * 977 + 13);
+        var rad = slot.angle * Math.PI / 180;
+        var dx = Math.cos(rad), dy = Math.sin(rad);
+        var px = -dy, py = dx; // perpendicular, for the curve's bulge
+        var reach = size * 0.42;
+        var bulge = size * 0.1;
+        var x0 = cx - dx * reach, y0 = cy - dy * reach;
+        var x1 = cx + dx * reach, y1 = cy + dy * reach;
+        var ctrlX = cx + px * bulge, ctrlY = cy + py * bulge;
 
-        var drawTaperedPath = (pts, width) => {
-          for (var i = 0; i < pts.length - 1; i++) {
-            var t = i / (pts.length - 1);
-            var w = Math.max(1.2, width * (1 - t * 0.75));
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = CONFIG.colors.crackLine;
-            ctx.lineWidth = w;
-            ctx.beginPath();
-            ctx.moveTo(pts[i][0], pts[i][1]);
-            ctx.lineTo(pts[i + 1][0], pts[i + 1][1]);
-            ctx.stroke();
-            ctx.strokeStyle = CONFIG.colors.crackGlow;
-            ctx.lineWidth = Math.max(1, w * 0.4);
-            ctx.beginPath();
-            ctx.moveTo(pts[i][0] - 1, pts[i][1] - 1);
-            ctx.lineTo(pts[i + 1][0] - 1, pts[i + 1][1] - 1);
-            ctx.stroke();
-          }
+        var drawCurve = (color, width, offset) => {
+          ctx.strokeStyle = color;
+          ctx.lineWidth = width;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(x0 + offset, y0 + offset);
+          ctx.quadraticCurveTo(ctrlX + offset, ctrlY + offset, x1 + offset, y1 + offset);
+          ctx.stroke();
         };
-
-        var branch = (x0, y0, angle, length, depth, width) => {
-          var segments = 3 + Math.floor(rand() * 2);
-          var x = x0, y = y0;
-          var pts = [[x, y]];
-          for (var i = 0; i < segments; i++) {
-            angle += (rand() - 0.5) * 0.9;
-            var segLen = length / segments;
-            x += Math.cos(angle) * segLen;
-            y += Math.sin(angle) * segLen;
-            pts.push([x, y]);
-            // depth < 3 (was < 2): one extra fork generation makes a denser,
-            // more dramatic shatter instead of a few lone lines.
-            if (depth < 3 && rand() < 0.6 && i > 0) {
-              branch(x, y, angle + (rand() < 0.5 ? -1 : 1) * (0.6 + rand() * 0.5), length * 0.5, depth + 1, width * 0.6);
-            }
-          }
-          drawTaperedPath(pts, width);
-        };
-
-        // Bigger base widths (11/9, was 6/5) and longer reach (0.46/0.38,
-        // was 0.38/0.3) so the crack fills most of the decal instead of a
-        // thin scribble lost in the middle of it.
-        var baseAngle = rand() * Math.PI * 2;
-        branch(cx, cy, baseAngle, size * 0.46, 0, 11);
-        branch(cx, cy, baseAngle + Math.PI, size * 0.38, 0, 9);
+        drawCurve(slot.core, 9, 0);
+        drawCurve(slot.glow, 3.5, -1.5);
 
         var img = document.createElement('img');
-        img.id = 'crackDecal' + this.instanceId + '_' + seed;
+        img.id = 'crackDecal' + this.instanceId + '_' + slotKey;
         img.src = canvas.toDataURL();
         return img;
       },

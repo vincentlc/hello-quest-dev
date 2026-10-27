@@ -557,6 +557,58 @@ otherwise block this later):**
   scene — that's a content/placement change for whenever it's wanted, not
   a code change, now that the lookup side is generic.
 
+**Step 4 crack redesign (same session, after Vincent shared a hand-drawn
+reference):** replaced the crack system entirely with a "snowman type"
+model, per a hand-drawn sketch Vincent shared (crossing curved bands, not
+flat jagged fracture decals).
+
+- **Only four valid types: 1, 3, 5, or 7 lives** (`CONFIG.hitsToExplode`).
+  Type 1 dies on the first hit with no crack at all. Every other type shows
+  one crack per hit, building toward death.
+- **Six fixed crack "slots"**, each a fixed color and a fixed crossing
+  angle: 1 (red) / 2 (amber) is the pair always shown right before death,
+  for any type that has at least 3 lives; 3 (pink) / 4 (green) is added
+  before that for type 5+; 6 / 7 (both blue) is added before even those,
+  only for type 7. `CRACK_MASTER_ORDER = [6, 7, 3, 4, 1, 2]` encodes this
+  once; `getCrackSlotsForLives(lives)` just takes the **last** `lives - 1`
+  entries of it -- a tougher snowman gets earlier cracks *prepended*, never
+  new ones appended after 1/2, so "cracks 1, 2, then dies" stays true for
+  every type that reaches them. Verified for all four types plus an
+  off-list value (4 snaps to the nearest valid type, 3, rather than
+  producing a broken half-pair).
+- **Every active crack crosses through the same central point** on the
+  torso (`CONFIG.crackCenter`), not spread to different spots -- matching
+  Vincent's sketch, where all the lines cross near the belly. This also
+  simplified the code a lot versus the previous per-crack-position
+  generator: since all decals share one position, only the *texture* needs
+  to differ per slot (drawn at `CRACK_SLOTS[slot].angle`), not the plane's
+  world transform. Decals are nudged a hair apart in z (0.002 model-local
+  units per slot) purely to avoid z-fighting between coplanar planes --
+  visually imperceptible.
+- **Curved sweep, not jagged fracture.** Vincent confirmed the original
+  hit-1 crack's curve/arc was good and a flat decal plane (not a true 3D
+  band wrapping the body, confirmed not needed) is sufficient. Rewrote
+  `makeCrackTexture` to draw one smooth quadratic-bezier stroke through the
+  shared center (core line + glow halo + highlight), replacing the earlier
+  branching-fracture canvas code entirely. `mulberry32` (the old PRNG for
+  randomizing branch patterns) is no longer used anywhere and was removed.
+- **Tested this session:** `getCrackSlotsForLives` output checked directly
+  for all four types (plus the off-list snap case); default type 3 (shows
+  slots [1,2]) and type 7 (shows all six) both exercised through full hit
+  cycles with screenshots confirming the crossing-curves look matches the
+  reference sketch at both close range and normal play distance; zero
+  console errors with `hitsToExplode` set at load time (the realistic way
+  this would ever be configured). **One false alarm during testing:**
+  reloading with `hitsToExplode` hot-swapped at runtime via
+  `removeAttribute`/`setAttribute` (an abnormal test-only technique, not
+  how the game ever actually reconfigures this) produced one THREE.js NaN
+  bounding-sphere console error; confirmed it does NOT reproduce when the
+  value is set the normal way (edited in CONFIG before page load) --
+  logged here only so a future session doesn't need to re-derive this if
+  the same red herring resurfaces.
+- **Not yet tested:** an actual Quest 2 headset, same outstanding item as
+  every step since step 3.
+
 <details>
 <summary>Original step 4 brief (superseded by the DONE notes above)</summary>
 
