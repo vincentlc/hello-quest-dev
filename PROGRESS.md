@@ -249,7 +249,80 @@ console errors as of this writing).
   errors).
 
 **Step 3 — throwing (desktop + controllers), pool, trajectory preview:
-NEXT. Prepared brief:**
+DONE.**
+
+- Two hand entities (`#leftHand`, `#rightHand`) added with `meta-touch-controls`
+  (confirmed current name for Quest Touch controllers by grepping
+  `vendor/aframe.min.js`; `oculus-touch-controls` also exists, same
+  implementation under the hood).
+- **The "simplest fix" for no laser pointer turned out to need one more
+  piece than planned.** Not attaching `laser-controls` isn't enough:
+  `meta-touch-controls` (like every vendor touch-controls component)
+  auto-attaches its own `raycaster` with `showLine: true` itself, internally,
+  as soon as a controller connects (confirmed in vendor source: its per-vendor
+  config merge defaults to `{showLine: true}` unless a specific vendor entry
+  overrides it, which `meta-touch-controls` doesn't). New small component
+  `hide-controller-line` listens for `controllerconnected` and
+  `controllermodelready` on each hand entity and flips `raycaster.showLine`
+  back to `false` every time the library turns it on. Couldn't verify this
+  on-device this session (no headset attached, see below); logic matches the
+  vendor source exactly, flag if a beam still shows up on the Quest.
+- `snowball-thrower` (on `<a-scene>`): 12-entity object pool of `<a-sphere>`
+  snowballs (radius `CONFIG.snowballRadius`, 8 segments, color
+  `CONFIG.colors.snowball`), reused by round-robin index rather than a
+  free-slot search. Per-source cooldown (`left`/`right`/`desktop` keys) using
+  the component's own `tick()` time as the clock, not `performance.now()`,
+  so cooldown and lifetime share one time base. Ballistic `tick()`:
+  Euler-integrates gravity + velocity with scratch `THREE.Vector3`s (no
+  per-frame allocation), clamps `dt` to 50ms to avoid a physics blow-up on a
+  stalled/backgrounded tab. "Hit" is a simple proximity check against
+  `#copito`'s world position (`CONFIG.snowballHitRadius`, generous) rather
+  than per-part collision, per the single-fused-mesh constraint; on hit it
+  deactivates the snowball and emits `snowball-hit` on `#copito` with
+  `{point: {x,y,z}}` in detail, step 4's contract.
+- `trajectory-preview`: one instance per aim source (`source: hand` on each
+  hand entity, `source: desktop` on the camera), each its own
+  `THREE.Points` buffer of `CONFIG.trajectoryDots` dots attached directly to
+  the scene root (world-space positions computed analytically each frame
+  from the same ballistic formula, independent of the source entity's own
+  transform). Hidden while that source's trigger/mouse is held, and the
+  desktop instance also hides itself in `vr-mode` (a mouse-driven arc
+  floating in front of the camera made no sense once a headset is in use;
+  not in the original brief, added since it was a one-line, obviously-correct
+  guard once building the desktop/VR split).
+- Desktop aim: a single shared `DesktopAim = {x, y}` (NDC mouse position,
+  updated by one `window` `mousemove` listener) used by both
+  `snowball-thrower` (via `THREE.Raycaster.setFromCamera` at throw time) and
+  the desktop `trajectory-preview` instance (every frame). Plain object + one
+  listener, not a third component, since it isn't tied to any entity.
+- Haptics: `CONFIG.haptics.throw` pulses via
+  `handEl.components['tracked-controls'].controller.gamepad.hapticActuators[0]`,
+  guarded at every step (works on desktop, confirmed no throw/crash when no
+  gamepad is present).
+- **Tested this session:** desktop click-to-throw in the Browser pane,
+  console clean on load and after repeated throws. The pane's headless
+  renderer only produces a frame on demand (confirmed:
+  `requestAnimationFrame` never fires on its own, even on a fronted,
+  `visibilityState: "visible"` tab; only a screenshot/CDP capture pumps one
+  frame), so real-time flight couldn't be watched frame-by-frame in a
+  screenshot loop. Verified correctness instead by driving
+  `snowball-thrower.tick()` manually in 16ms steps from a real
+  `throwFromDesktop()` call: the snowball reached `z ≈ -4.75` (Copito is at
+  `z = -5`) after 0.53s of simulated flight and fired `snowball-hit` with a
+  sane `point`, and the haptics-guard path didn't throw when called on a hand
+  entity with no connected controller. **Not yet tested: an actual Quest 2
+  headset** (trigger throw, haptics felt, hide-controller-line working
+  on-device, 72 fps during normal play) — do that before calling this step
+  fully verified, same as step 1's "zero console errors" bar but for VR
+  input this time.
+
+<details>
+<summary>Original step 3 brief (superseded by the DONE notes above)</summary>
+
+Scope was strictly throwing mechanics: input, the snowball object pool,
+ballistic flight, and the aim-assist arc. Hit reactions (squash, flash,
+cracks) stay out of this step and land in step 4 — see the event contract
+note below for how the two steps meet.**
 
 Scope is strictly throwing mechanics: input, the snowball object pool,
 ballistic flight, and the aim-assist arc. Hit reactions (squash, flash,
@@ -307,6 +380,8 @@ note below for how the two steps meet.
 - **New CONFIG value needed**: snowball color isn't defined yet (original
   spec: `#F4FFFD`, slightly blue-tinted white) — add
   `CONFIG.colors.snowball` when implementing.
+
+</details>
 
 **Step 4 — 3-hit reactions: not started. Prepared brief (adapted for the
 single-mesh model):**
