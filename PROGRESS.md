@@ -248,12 +248,65 @@ console errors as of this writing).
   browser (sparkle positions clearly shift frame to frame, zero console
   errors).
 
-**Step 3 — throwing (desktop + controllers), pool, trajectory preview: not
-started.** Unaffected by any deviations so far; follow the original spec
-directly. `CONFIG` already has `throwSpeed`, `throwUpBias`, `gravity`,
-`throwCooldown`, `maxSnowballs`, `snowballLifetime`, `showTrajectory`,
-`trajectoryDots` defined and ready to use. Trajectory preview should also be
-one `THREE.Points` system, not N entities.
+**Step 3 — throwing (desktop + controllers), pool, trajectory preview:
+NEXT. Prepared brief:**
+
+Scope is strictly throwing mechanics: input, the snowball object pool,
+ballistic flight, and the aim-assist arc. Hit reactions (squash, flash,
+cracks) stay out of this step and land in step 4 — see the event contract
+note below for how the two steps meet.
+
+- **No controller entities exist yet.** The scene currently has only the
+  camera; this step adds `<a-entity>` controller entities for Quest (left
+  and right hand) for the first time. Use A-Frame's built-in Touch
+  controller component (verify the exact name, e.g. `oculus-touch-controls`
+  vs a newer `meta-touch-controls`, by grepping `vendor/aframe.min.js`
+  rather than trusting memory, per the step 1 lesson).
+- **Deviation (planned, not left open): no laser pointer at all.** The
+  original spec's own note says to keep hello_quest's laser lines "hidden or
+  very short" because they fight with the dotted trajectory arc. Simplest
+  fix: don't attach `laser-controls` / a raycaster line to the hand entities
+  in the first place, since nothing in this demo needs point-and-click UI.
+  The dotted parabola arc is the only aim visual, and it is more accurate
+  than a straight laser anyway (it shows the actual gravity drop).
+- **Two components**, matching the original spec's component list:
+  - `snowball-thrower` (likely on `<a-scene>`): owns the 12-entity object
+    pool (`CONFIG.maxSnowballs`, pre-created once, reused, not
+    created/destroyed per throw), listens for `triggerdown` on each hand
+    entity and `mousedown`/click on the canvas for desktop, tracks a
+    **separate cooldown timer per input source** (`CONFIG.throwCooldown`)
+    so one hand's cooldown doesn't block the other, and runs the ballistic
+    `tick()`: Euler-integrate `velocity.y -= gravity * dt`,
+    `position += velocity * dt` per active snowball, reusing scratch
+    `THREE.Vector3` instances (no per-frame allocation, per the spec's
+    performance budget). Initial velocity = aim direction *
+    `CONFIG.throwSpeed` with `CONFIG.throwUpBias` added to the Y component.
+    Each snowball deactivates (hidden, flagged free in the pool) after
+    `CONFIG.snowballLifetime` or on a hit.
+  - `trajectory-preview` (one instance per aim source: each hand entity,
+    plus a desktop one driven by the camera + live mouse position): one
+    `THREE.Points` buffer per source for the dotted arc (`CONFIG.showTrajectory`
+    toggle, `CONFIG.trajectoryDots` points), positions computed analytically
+    from the same ballistic formula so the dots actually match where the
+    snowball will go. Hidden while that source's trigger/mouse button is
+    held down (spec: "while the trigger is not pressed").
+- **Desktop aim**: left-click throws from the camera, direction toward the
+  mouse cursor (`THREE.Raycaster` through NDC mouse coordinates against the
+  camera), not just the camera's forward vector. Keep existing
+  `look-controls` + `wasd-controls` as is.
+- **Event contract with step 4**: since hit reactions aren't built yet, a
+  snowball that comes within a generous radius of Copito's position
+  (`CONFIG.snowmanDistance`) deactivates and fires a `snowball-hit` DOM
+  event on the `#copito` entity with the impact point in the detail payload.
+  Step 4 just adds the listener; step 3 doesn't need Copito to react yet, so
+  it's independently testable (watch snowballs fly, arc, and vanish near
+  Copito).
+- **Haptics**: wire up `CONFIG.haptics.throw` (`[0.3, 40]`, already defined)
+  via `gamepad.hapticActuators[0].pulse()` on throw, guarded behind an
+  existence check so desktop (no gamepad) doesn't throw an error.
+- **New CONFIG value needed**: snowball color isn't defined yet (original
+  spec: `#F4FFFD`, slightly blue-tinted white) — add
+  `CONFIG.colors.snowball` when implementing.
 
 **Step 4 — 3-hit reactions: not started. Prepared brief (adapted for the
 single-mesh model):**
