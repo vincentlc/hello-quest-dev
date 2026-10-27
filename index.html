@@ -133,14 +133,22 @@
       throwUpBias: 0.15,
       gravity: 9.8,
       throwCooldown: 0.25,
-      maxSnowballs: 12,
+      // 16 total, 12 of which can be sitting landed on the ground (see
+      // maxLandedSnowballs below) -- the 4 extra over that give balls
+      // actually in flight somewhere to live even when the ground is full,
+      // instead of every single throw once-full fighting the pile for a slot.
+      maxSnowballs: 16,
       snowballLifetime: 3,
       snowballRadius: 0.08,
-      // "Hit" is a proximity check against Copito's position, not real
-      // collision geometry (step 3's event contract note: the model is one
-      // fused mesh, so there are no separate part hitboxes). Generous on
+      // "Hit" is a capsule check against Copito's position: within
+      // snowballHitRadius horizontally, and between the ground and his full
+      // height vertically -- not real collision geometry (step 3's event
+      // contract note: the model is one fused mesh, so there are no
+      // separate part hitboxes), but covers him head-to-foot (including the
+      // hat) rather than only a sphere down at his feet. Generous on
       // purpose so aiming slightly off still reads as a hit.
       snowballHitRadius: 0.5,
+      hitHeightMargin: 0.15, // extra headroom above snowmanHeight, for the hat tip
       showTrajectory: true,
       trajectoryDots: 12,
       trajectoryDotInterval: 0.08, // seconds of flight time between dots
@@ -150,12 +158,22 @@
       // The pool's existing round-robin reuse (see snowball-thrower.spawn)
       // naturally evicts the oldest landed one once the cap is hit -- no
       // separate timer needed, it just gets thrown again like a fresh ball.
-      maxLandedSnowballs: 8,
+      // Landings close to an existing pile (landedStackRadius) stack
+      // vertically on top of it instead of overlapping at ground level.
+      maxLandedSnowballs: 12,
+      landedStackRadius: 0.12, // how close counts as "the same spot"
       landedSquashY: 0.45,  // scale.y multiplier once packed into the ground
       landedSquashXZ: 1.3,  // scale.x/z multiplier (spreads out as it flattens)
       landedSquashTime: 0.12, // seconds to ease into the squashed shape
 
-      // Hits and explosion (steps 4-5)
+      // Hits and explosion (steps 4-5). hitsToExplode is the snowman's
+      // "lives": one crack appears per hit up to the last one (which
+      // explodes instead), so more lives = more cracks, generated
+      // procedurally (see generateCrackPositions) rather than hand-placed.
+      // Default 3 (2 cracks); designed to go up to 7 (6 cracks) later for a
+      // bigger snowman variant -- that bigger-body/bigger-count variant
+      // itself isn't built yet, this just keeps the hit/crack system from
+      // hard-coding "exactly 2" so raising this number alone will work.
       hitsToExplode: 3,
       chunkCount: 50,
       chunkSpeedMin: 2,
@@ -164,11 +182,14 @@
       idleSparkleCount: 120,
       explosionSparkleCount: 250,
 
-      // Hit reactions (step 4). Squash/wobble amplitudes are indexed by
-      // hitCount - 1 (hit 1, then the bigger hit 2). Applied as decaying
-      // impulses on top of the idle bob/sway, same pattern as those.
-      hitSquashAmplitude: [0.16, 0.3],
-      hitWobbleAmplitude: [0.0, 0.22], // extra rotation wobble, hit 2 only
+      // Hit reactions (step 4). Squash/wobble amplitude ramps linearly
+      // across the hits leading up to the explosion (hit 1 at the low end,
+      // the second-to-last hit at the high end) instead of a fixed
+      // per-hit-index table, so it scales automatically with hitsToExplode.
+      // Applied as decaying impulses on top of the idle bob/sway, same
+      // pattern as those.
+      hitSquashAmplitudeRange: [0.16, 0.34],
+      hitWobbleAmplitudeRange: [0.0, 0.26], // wobble ramps in from none to a real shake
       hitImpulseDuration: 0.5,     // seconds for the squash/wobble to decay out
       hitImpulseFrequency: 4,     // Hz, how fast the squash/wobble oscillates while decaying
       hitFlashColor: '#FFFFFF',
@@ -176,6 +197,27 @@
       snowPuffCount: 24,
       snowPuffSpeed: 1.3,
       snowPuffLifetime: 0.45,
+
+      // Crack decals (step 4): one shown per hit, up to hitsToExplode - 1 of
+      // them (the final hit explodes instead of cracking). Positions come
+      // from generateCrackPositions(count), not a hand-written list, so the
+      // count tracks hitsToExplode automatically. Authored in Copito's own
+      // el-local meters (same frame as copitoOffset), converted to the
+      // model's raw/pre-scale space at build time (see
+      // copito.worldToModelLocal) so each decal can be parented inside the
+      // model wrapper and inherit every animation (bob/sway/squash/wobble)
+      // for free, instead of drifting separately.
+      crackSize: 0.75, // big enough to read as a real fracture across the torso, not a small nick
+
+      // Hit squash/wobble (step 4) rotate/scale around this point instead
+      // of the model wrapper's own raw origin. The wrapper's local origin
+      // sits wherever the glTF's messy export transform happens to put it
+      // (far from the visible mesh -- see copitoOffset's own comment), so
+      // rotating/scaling it directly swings the whole body sideways by a
+      // large distance instead of wobbling in place. This pivot is a plain
+      // point in el-local meters, roughly mid-body height, with no such
+      // baggage -- see the hitPivot setup in copito.init.
+      hitPivotHeight: 0.8,
 
       // Sound volumes 0 to 1 (step 6)
       volume: {
@@ -205,7 +247,12 @@
         iceNose: '#2EC4B6',
         crownCyan: '#7DF9FF',
         sparkle: '#B8FFF4',
-        snowball: '#F4FFFD'
+        snowball: '#F4FFFD',
+        // Crack decal (step 4): dark fracture line + a bright icy glow/
+        // highlight for contrast against the pale body, staying in the
+        // existing cold teal/cyan palette rather than an off-theme red.
+        crackLine: '#0A2A28',
+        crackGlow: '#7DF9FF'
       }
     };
 
@@ -278,7 +325,6 @@
 
         this.buildPool();
 
-        this.copito = this.el.querySelector('#copito');
         this.leftHand = this.el.querySelector('#leftHand');
         this.rightHand = this.el.querySelector('#rightHand');
 
@@ -347,11 +393,9 @@
         this.nextIndex = (this.nextIndex + 1) % this.pool.length;
 
         // Reusing a slot that's currently sitting packed on the ground --
-        // drop it from the landed FIFO first, since it's about to fly again.
-        if (sb.state === 'landed') {
-          var idx = this.landed.indexOf(sb);
-          if (idx !== -1) this.landed.splice(idx, 1);
-        }
+        // free it (and anything stacked on top of it, see freeLanded) since
+        // it's about to fly again.
+        if (sb.state === 'landed') this.freeLanded(sb);
 
         sb.state = 'flying';
         sb.spawnTime = this.lastTickTime;
@@ -369,18 +413,101 @@
       },
 
       // A miss that reaches the ground packs flat and stays there (reads as
-      // snow piling up) instead of vanishing. Bounded by maxLandedSnowballs:
-      // once full, the oldest landed ball is freed back to the pool so the
-      // round-robin in spawn() can reuse its slot immediately.
+      // snow piling up) instead of vanishing. A landing close to an
+      // existing pile (landedStackRadius) stacks vertically on top of it
+      // instead of overlapping at ground level. Bounded by
+      // maxLandedSnowballs: once full, the oldest landed ball is freed back
+      // to the pool so the round-robin in spawn() can reuse its slot
+      // immediately.
       land: function (sb) {
+        var pos = sb.el.object3D.position;
+        var unit = CONFIG.snowballRadius * CONFIG.landedSquashY; // squashed half-height
+        var base = this.findStackBase(pos);
+
         sb.state = 'landed';
         sb.landTime = this.lastTickTime;
         sb.velocity.set(0, 0, 0);
-        sb.el.object3D.position.y = CONFIG.snowballRadius * CONFIG.landedSquashY;
+
+        if (base) {
+          var basePos = base.el.object3D.position;
+          pos.x = basePos.x;
+          pos.z = basePos.z;
+          pos.y = basePos.y + unit * 2; // sits directly on top of base's packed height
+        } else {
+          pos.y = unit;
+        }
+
         this.landed.push(sb);
         if (this.landed.length > CONFIG.maxLandedSnowballs) {
-          this.deactivate(this.landed.shift());
+          this.evictForCap();
         }
+      },
+
+      // The landed ball (if any) directly under a new impact point, i.e.
+      // the current top of whatever pile is already at that spot.
+      findStackBase: function (pos) {
+        var best = null;
+        for (var i = 0; i < this.landed.length; i++) {
+          var other = this.landed[i];
+          var otherPos = other.el.object3D.position;
+          var dx = otherPos.x - pos.x;
+          var dz = otherPos.z - pos.z;
+          if (dx * dx + dz * dz > CONFIG.landedStackRadius * CONFIG.landedStackRadius) continue;
+          if (!best || otherPos.y > best.el.object3D.position.y) best = other;
+        }
+        return best;
+      },
+
+      // True if some other landed ball sits directly on top of sb (i.e. sb
+      // is currently buried, not the top of its pile).
+      hasSupportAbove: function (sb) {
+        var pos = sb.el.object3D.position;
+        return this.landed.some((other) => {
+          if (other === sb) return false;
+          var otherPos = other.el.object3D.position;
+          var dx = otherPos.x - pos.x;
+          var dz = otherPos.z - pos.z;
+          return dx * dx + dz * dz <= CONFIG.landedStackRadius * CONFIG.landedStackRadius &&
+            otherPos.y > pos.y;
+        });
+      },
+
+      // Cap eviction always targets the oldest ball that's currently the
+      // TOP of its own pile -- never a buried one. A tall single stack at
+      // one spot caps out instead of periodically collapsing wholesale
+      // (which freeing a buried base would otherwise do, see freeLanded).
+      evictForCap: function () {
+        for (var i = 0; i < this.landed.length; i++) {
+          if (!this.hasSupportAbove(this.landed[i])) {
+            this.freeLanded(this.landed[i]);
+            return;
+          }
+        }
+        this.freeLanded(this.landed[0]); // every ball buried somehow -- shouldn't happen, but don't get stuck
+      },
+
+      // Frees a landed ball back to the pool. If other landed balls are
+      // stacked directly on top of it, they'd be left floating once it's
+      // gone -- so they're freed too (the pile topples along with its
+      // base), recursively up the stack. Reached from two places: a direct
+      // slot steal in spawn() (no choice which ball), and evictForCap's
+      // fallback -- evictForCap's normal path only ever targets topmost
+      // balls, so this recursion is a no-op there in practice.
+      freeLanded: function (sb) {
+        var idx = this.landed.indexOf(sb);
+        if (idx !== -1) this.landed.splice(idx, 1);
+
+        var pos = sb.el.object3D.position;
+        var above = this.landed.filter((other) => {
+          var otherPos = other.el.object3D.position;
+          var dx = otherPos.x - pos.x;
+          var dz = otherPos.z - pos.z;
+          return dx * dx + dz * dz <= CONFIG.landedStackRadius * CONFIG.landedStackRadius &&
+            otherPos.y > pos.y;
+        });
+        above.forEach((other) => this.freeLanded(other));
+
+        this.deactivate(sb);
       },
 
       pulseHaptics: function (handEl, intensity, durationMs) {
@@ -392,13 +519,12 @@
 
       // Ballistic update for every live snowball (Euler integration, scratch
       // vectors reused, no per-frame allocation) + the proximity "hit"
-      // check against Copito that hands off to step 4 via the
-      // `snowball-hit` DOM event (step 4 just adds the listener).
+      // check against every registered snowman (see copitoRegistry) that
+      // hands off to step 4 via the `snowball-hit` DOM event on whichever
+      // one got hit.
       tick: function (time, delta) {
         this.lastTickTime = time;
         var dt = Math.min(delta / 1000, 0.05);
-
-        this.copito.object3D.getWorldPosition(this.scratchCopitoPos);
 
         for (var i = 0; i < this.pool.length; i++) {
           var sb = this.pool[i];
@@ -422,8 +548,9 @@
           sb.el.object3D.position.addScaledVector(sb.velocity, dt);
 
           var pos = sb.el.object3D.position;
-          if (pos.distanceTo(this.scratchCopitoPos) <= CONFIG.snowballHitRadius) {
-            this.copito.emit('snowball-hit', { point: { x: pos.x, y: pos.y, z: pos.z } });
+          var hitSnowman = this.findHitSnowman(pos);
+          if (hitSnowman) {
+            hitSnowman.el.emit('snowball-hit', { point: { x: pos.x, y: pos.y, z: pos.z } });
             this.deactivate(sb);
             continue;
           }
@@ -437,8 +564,86 @@
             this.deactivate(sb);
           }
         }
+      },
+
+      // Capsule check (horizontal radius + a height range, not a single
+      // sphere) against every registered snowman, not just one hardcoded
+      // entity -- a sphere centered on a snowman's root (his feet) would
+      // miss anything near the head/hat, since that's a full snowmanHeight
+      // above the check point. Generous on purpose so aiming slightly off
+      // still reads as a hit. Returns the first snowman hit, or null.
+      findHitSnowman: function (pos) {
+        for (var i = 0; i < copitoRegistry.length; i++) {
+          var snowman = copitoRegistry[i];
+          snowman.el.object3D.getWorldPosition(this.scratchCopitoPos);
+          var dx = pos.x - this.scratchCopitoPos.x;
+          var dz = pos.z - this.scratchCopitoPos.z;
+          var horizontalDist = Math.sqrt(dx * dx + dz * dz);
+          var withinHeight = pos.y >= this.scratchCopitoPos.y &&
+            pos.y <= this.scratchCopitoPos.y + CONFIG.snowmanHeight + CONFIG.hitHeightMargin;
+          if (horizontalDist <= CONFIG.snowballHitRadius && withinHeight) return snowman;
+        }
+        return null;
       }
     });
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
+    // ---------------------------------------------------------------------
+    // copitoRegistry: every live `copito` component instance. Hit detection
+    // (snowball-thrower.findHitSnowman) loops this instead of looking up a
+    // single hardcoded `#copito` id, so multiple snowmen on the map later
+    // is a matter of adding more entities, not touching the throw/hit code.
+    // Not built/used for placing multiple snowmen yet -- just the lookup
+    // side made generic now, per Vincent's future-proofing request.
+    // ---------------------------------------------------------------------
+    var copitoRegistry = [];
+    var copitoInstanceCounter = 0; // unique id source for per-instance asset ids, see copito.init
+
+    // ---------------------------------------------------------------------
+    // generateCrackPositions: one crack decal per hit up to hitsToExplode-1
+    // (see CONFIG's comment), spread across a front-facing arc that widens
+    // as more cracks need to fit so they stay individually legible instead
+    // of piling on top of each other. Pure function of `count` -- no
+    // per-instance state -- so every snowman (when there's more than one,
+    // later) gets the same procedural layout. Returns positions in the
+    // el-local meters frame (same as copitoOffset).
+    // ---------------------------------------------------------------------
+    function generateCrackPositions(count) {
+      var positions = [];
+      if (count <= 0) return positions;
+      // 58deg matches the original hand-placed two-crack look; widening per
+      // extra crack keeps the per-crack spacing roughly constant instead of
+      // cramming more and more into the same fixed arc.
+      var arc = Math.min(260, 58 + (count - 2) * 42);
+      var startAngle = -arc / 2;
+      for (var i = 0; i < count; i++) {
+        var t = count > 1 ? i / (count - 1) : 0.5;
+        var angle = startAngle + t * arc;
+        var rad = angle * Math.PI / 180;
+        positions.push({
+          x: Math.sin(rad) * 0.16,
+          y: 0.85 - (i % 3) * 0.1, // slight vertical variety once there are more than a couple
+          z: Math.cos(rad) * 0.1 + 0.14,
+          rotationY: angle
+        });
+      }
+      return positions;
+    }
+
+    // ---------------------------------------------------------------------
+    // mulberry32: tiny seeded PRNG (one multiply-heavy 32-bit step), used
+    // only so each crack decal texture gets a distinct-but-reproducible
+    // branch pattern instead of each page load drawing something new.
+    // ---------------------------------------------------------------------
+    function mulberry32(seed) {
+      return function () {
+        seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+        var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
 
     // ---------------------------------------------------------------------
     // circleSpriteTexture: a small soft-edged white circle, painted once on
@@ -601,6 +806,15 @@
       init: function () {
         var el = this.el;
 
+        // Unique per-instance id, used to namespace dynamically-created
+        // <img> asset ids (blob shadow, crack textures) below -- with a
+        // fixed id, two snowmen would collide on the same DOM id and the
+        // second one's textures would silently resolve to the first one's.
+        // Not needed with only one snowman today, but several on the map is
+        // explicitly planned, so this is cheap to get right now.
+        this.instanceId = copitoInstanceCounter++;
+        copitoRegistry.push(this);
+
         // Soft round blob shadow so Copito doesn't look like he's floating.
         // A-Frame has no built-in radial-gradient material, so we paint one
         // on a small canvas once and use it as the plane's texture.
@@ -611,25 +825,42 @@
         shadow.setAttribute('position', '0 0.005 0');
         shadow.setAttribute('width', '1.3');
         shadow.setAttribute('height', '1.3');
-        shadow.setAttribute('material', 'src: #blobShadow; transparent: true; shader: flat');
+        shadow.setAttribute('material', 'src: #' + shadowImg.id + '; transparent: true; shader: flat');
         el.appendChild(shadow);
+
+        // hitPivot: a plain, well-centered rotation/scale point for the hit
+        // squash + wobble (see CONFIG.hitPivotHeight's comment for why this
+        // exists -- the model wrapper's own origin is a bad pivot). Sits
+        // directly under `el`, in the same plain el-local meters as
+        // everything else positioned there.
+        this.hitPivot = document.createElement('a-entity');
+        this.hitPivot.setAttribute('position', '0 ' + CONFIG.hitPivotHeight + ' 0');
+        el.appendChild(this.hitPivot);
 
         // The model's own export has a messy internal transform (Sketchfab's
         // auto-converted FBX hierarchy: odd scale, off-center pivot). Rather
         // than fight that, we load it into a wrapper entity and correct it
         // with one scale + one position offset, both tunable from CONFIG.
+        // Nested inside hitPivot (not `el` directly) now, with its position
+        // adjusted by -hitPivot's own offset so nothing moves at rest (zero
+        // squash/wobble) -- see hitPivotHeight's comment.
         this.model = document.createElement('a-entity');
         this.model.setAttribute('gltf-model', '#copitoModel');
         this.model.setAttribute('scale', CONFIG.copitoScale + ' ' + CONFIG.copitoScale + ' ' + CONFIG.copitoScale);
-        this.model.setAttribute('position', CONFIG.copitoOffset);
-        el.appendChild(this.model);
-
-        // Base position for the idle bob/sway below -- read from CONFIG
-        // directly rather than back from the DOM attribute, since the
-        // entity's object3D isn't guaranteed to have applied it yet this
-        // same tick.
         var offset = CONFIG.copitoOffset.split(' ').map(Number);
-        this.modelBasePosition = { x: offset[0], y: offset[1], z: offset[2] };
+        this.model.setAttribute('position', offset[0] + ' ' + (offset[1] - CONFIG.hitPivotHeight) + ' ' + offset[2]);
+        this.hitPivot.appendChild(this.model);
+
+        // Two base positions, different frames:
+        // - copitoOffsetVec: the original, unshifted el-local offset. Used
+        //   by worldToModelLocal to place the crack decals -- that mapping
+        //   is unaffected by hitPivot's existence (it nets out to the same
+        //   translation chain at rest), so it stays keyed to the original.
+        // - modelBasePosition: hitPivot-relative, used below for the idle
+        //   bob/sway position-setting each tick (model's parent is now
+        //   hitPivot, not `el`, so its base position must be too).
+        this.copitoOffsetVec = { x: offset[0], y: offset[1], z: offset[2] };
+        this.modelBasePosition = { x: offset[0], y: offset[1] - CONFIG.hitPivotHeight, z: offset[2] };
 
         this.buildSparkles();
 
@@ -644,8 +875,28 @@
         this.wobbleImpulse = { time: -Infinity, amplitude: 0 };
         this.model.addEventListener('model-loaded', () => this.collectMaterials());
         this.buildSnowPuffs();
-        this.buildCrackDecal();
+        this.buildCrackDecals();
         this.el.addEventListener('snowball-hit', (evt) => this.onHit(evt.detail));
+      },
+
+      // copitoOffset/copitoScale correct the glTF's own messy raw-export
+      // transform (see the class comment above), which means `this.model`'s
+      // local space is that raw, pre-correction space -- not plain meters.
+      // Anything parented inside it (the crack decals) needs its authored
+      // "nice meters, same frame as copitoOffset" position converted into
+      // that raw space once, at build time. After that one conversion, the
+      // decal is a rigid child of the model wrapper and inherits every
+      // subsequent animation (bob/sway/squash/wobble) automatically through
+      // the normal parent-child transform hierarchy -- no per-frame syncing
+      // needed, which is what kept the single old crack decal visually
+      // detached from the body (it was parented to the non-animated outer
+      // entity instead).
+      worldToModelLocal: function (v) {
+        return {
+          x: (v.x - this.copitoOffsetVec.x) / CONFIG.copitoScale,
+          y: (v.y - this.copitoOffsetVec.y) / CONFIG.copitoScale,
+          z: (v.z - this.copitoOffsetVec.z) / CONFIG.copitoScale
+        };
       },
 
       // Idle bob (vertical sine) + slight sway (side-to-side tilt), applied
@@ -664,18 +915,18 @@
           this.modelBasePosition.y + bob,
           this.modelBasePosition.z
         );
+        this.model.object3D.rotation.z = sway;
 
-        // Hit squash/wobble (step 4): decaying impulses layered on top of
-        // the idle sway/scale, same "deltas on top of the base transform"
-        // pattern as bob/sway above, so hit reactions and idle animation
-        // never fight over the same transform.
+        // Hit squash/wobble (step 4): decaying impulses applied on
+        // hitPivot, not the model wrapper -- see CONFIG.hitPivotHeight's
+        // comment for why (the wrapper's own origin is a bad pivot for
+        // rotation/scale; hitPivot is a well-centered stand-in). Deltas on
+        // top of its identity rest pose, same pattern as bob/sway above.
         var squash = this.computeImpulse(time, this.squashImpulse);
         var wobble = this.computeImpulse(time, this.wobbleImpulse);
-        var scaleY = CONFIG.copitoScale * (1 - squash);
-        var scaleXZ = CONFIG.copitoScale * (1 + squash * 0.5);
-        this.model.object3D.scale.set(scaleXZ, scaleY, scaleXZ);
-        this.model.object3D.rotation.z = sway + wobble;
-        this.model.object3D.rotation.x = wobble * 0.6;
+        this.hitPivot.object3D.scale.set(1 + squash * 0.5, 1 - squash, 1 + squash * 0.5);
+        this.hitPivot.object3D.rotation.z = wobble;
+        this.hitPivot.object3D.rotation.x = wobble * 0.6;
 
         this.revertFlashIfDone(time);
         this.updateSnowPuffs(time);
@@ -693,29 +944,39 @@
         return impulse.amplitude * decay * -Math.cos(elapsed * CONFIG.hitImpulseFrequency * Math.PI * 2);
       },
 
-      // Escalating reaction per hit, per the step 4 brief: squash+flash+puff
-      // on hit 1, a bigger wobble + crack decal on hit 2. Hit 3 hands off to
-      // step 5's explosion (not built yet), so for now it just resets clean
-      // rather than leaving Copito stuck mid-damage.
+      // Escalating reaction per hit: every hit gets squash+flash+puff+one
+      // more crack (a new one each time, scaling with hitsToExplode -- see
+      // its CONFIG comment), with squash/wobble amplitude ramping up
+      // (computeImpulse's lerp below) as the hit count climbs toward the
+      // last one. The last hit (hitCount reaches hitsToExplode) hands off
+      // to step 5's explosion (not built yet), so for now it just resets
+      // clean rather than leaving Copito stuck mid-damage.
       onHit: function (detail) {
         var time = this.lastTime;
         this.hitCount++;
 
         this.spawnSnowPuff(detail.point);
         this.flashMaterials(time);
-        this.squashImpulse.time = time;
-        this.squashImpulse.amplitude = CONFIG.hitSquashAmplitude[Math.min(this.hitCount, 2) - 1];
 
-        if (this.hitCount === 2) {
+        // 0 at hit 1, 1 at the last hit before the explosion -- how far
+        // along the escalation this hit is, for the amplitude ramps below.
+        var crackStages = Math.max(1, CONFIG.hitsToExplode - 1);
+        var progress = Math.min(this.hitCount - 1, crackStages - 1) / Math.max(1, crackStages - 1);
+
+        this.squashImpulse.time = time;
+        this.squashImpulse.amplitude = lerp(CONFIG.hitSquashAmplitudeRange[0], CONFIG.hitSquashAmplitudeRange[1], progress);
+
+        if (this.hitCount < CONFIG.hitsToExplode) {
           this.wobbleImpulse.time = time;
-          this.wobbleImpulse.amplitude = CONFIG.hitWobbleAmplitude[1];
-          this.showCrackDecal();
+          this.wobbleImpulse.amplitude = lerp(CONFIG.hitWobbleAmplitudeRange[0], CONFIG.hitWobbleAmplitudeRange[1], progress);
+          var crackIndex = this.hitCount - 1;
+          if (this.crackDecals[crackIndex]) this.showCrackDecal(crackIndex);
         }
 
         if (this.hitCount >= CONFIG.hitsToExplode) {
           this.el.emit('snowman-destroyed', { point: detail.point });
           this.hitCount = 0;
-          this.hideCrackDecal();
+          this.hideCrackDecals();
         }
       },
 
@@ -809,47 +1070,130 @@
         if (!anyAlive) this.snowPuffs.visible = false;
       },
 
-      // Built once (hidden) and just toggled visible/invisible on hit
-      // 2/reset, rather than created and torn down each time. Position is
-      // an approximate torso height/depth for CONFIG.snowmanHeight -- tune
-      // here if it floats off the body once seen on a real headset.
-      buildCrackDecal: function () {
-        var canvas = document.createElement('canvas');
-        canvas.width = canvas.height = 128;
-        var ctx = canvas.getContext('2d');
-        ctx.strokeStyle = 'rgba(15,45,45,0.85)';
-        ctx.lineWidth = 3;
-        var cx = 64, cy = 64;
-        [[30, 10], [104, 24], [16, 110], [112, 104], [64, 122]].forEach((p) => {
-          var midX = (cx + p[0]) / 2 + (Math.random() * 16 - 8);
-          var midY = (cy + p[1]) / 2 + (Math.random() * 16 - 8);
-          ctx.beginPath();
-          ctx.moveTo(cx, cy);
-          ctx.lineTo(midX, midY);
-          ctx.lineTo(p[0], p[1]);
-          ctx.stroke();
-        });
+      // One decal per hit leading up to the explosion (count =
+      // hitsToExplode - 1, see CONFIG's comment), built once hidden and
+      // just toggled visible as hitCount climbs / on reset, rather than
+      // created and torn down each time. Positions come from
+      // generateCrackPositions, not a hand-written list, so raising
+      // hitsToExplode alone grows the set. Parented inside `this.model`
+      // (not `this.el`) so they move with every body animation -- see
+      // worldToModelLocal's comment for why that's what actually keeps
+      // them glued to Copito.
+      buildCrackDecals: function () {
+        var positions = generateCrackPositions(Math.max(0, CONFIG.hitsToExplode - 1));
+        this.crackDecals = positions.map((cfg, i) => this.buildCrackDecal(cfg, i));
+      },
 
-        var img = document.createElement('img');
-        img.id = 'crackDecal';
-        img.src = canvas.toDataURL();
+      buildCrackDecal: function (cfg, index) {
+        var img = this.makeCrackTexture(index);
         this.el.sceneEl.querySelector('a-assets').appendChild(img);
 
-        this.crackDecal = document.createElement('a-plane');
-        this.crackDecal.setAttribute('width', 0.5);
-        this.crackDecal.setAttribute('height', 0.5);
-        this.crackDecal.setAttribute('position', '0 0.9 0.25');
-        this.crackDecal.setAttribute('material', 'src: #crackDecal; transparent: true; shader: flat; side: double');
-        this.crackDecal.setAttribute('visible', false);
-        this.el.appendChild(this.crackDecal);
+        var localPos = this.worldToModelLocal(cfg);
+        var localSize = CONFIG.crackSize / CONFIG.copitoScale;
+
+        var decal = document.createElement('a-plane');
+        decal.setAttribute('width', localSize);
+        decal.setAttribute('height', localSize);
+        decal.setAttribute('position', localPos.x + ' ' + localPos.y + ' ' + localPos.z);
+        decal.setAttribute('rotation', '0 ' + cfg.rotationY + ' 0');
+        decal.setAttribute('material', 'src: #' + img.id + '; transparent: true; shader: flat; side: double; alphaTest: 0.02');
+        decal.setAttribute('visible', false);
+        this.model.appendChild(decal);
+        return decal;
       },
 
-      showCrackDecal: function () {
-        this.crackDecal.setAttribute('visible', true);
+      // A jagged, tapered, branching fracture (not just straight lines) with
+      // a soft glow halo behind it for contrast against the pale body, plus
+      // a thin bright highlight riding each line for a "catching the light"
+      // sparkle. Icy teal/cyan (CONFIG.colors.crackLine/crackGlow), not red
+      // -- red reads as a wound, which fights the cute-snowman tone; the
+      // glow+outline contrast carries the visibility instead. `seed` picks
+      // a stable-but-distinct random pattern per decal so neighboring
+      // cracks look different, not copies of each other. The glow is kept
+      // fairly tight around the lines on purpose -- with several decals
+      // placed close together (more hitsToExplode = more, closer cracks),
+      // an overly wide halo on each one bleeds into its neighbors and the
+      // individual fractures stop reading as distinct.
+      makeCrackTexture: function (seed) {
+        var size = 256;
+        var canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        var ctx = canvas.getContext('2d');
+        var cx = size / 2, cy = size / 2;
+
+        var outerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.3);
+        outerGlow.addColorStop(0, CONFIG.colors.crackGlow + '55');
+        outerGlow.addColorStop(0.6, CONFIG.colors.crackGlow + '22');
+        outerGlow.addColorStop(1, CONFIG.colors.crackGlow + '00');
+        ctx.fillStyle = outerGlow;
+        ctx.fillRect(0, 0, size, size);
+
+        var coreGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.13);
+        coreGlow.addColorStop(0, CONFIG.colors.crackGlow + 'AA');
+        coreGlow.addColorStop(1, CONFIG.colors.crackGlow + '00');
+        ctx.fillStyle = coreGlow;
+        ctx.fillRect(0, 0, size, size);
+
+        var rand = mulberry32(seed * 977 + 13);
+
+        var drawTaperedPath = (pts, width) => {
+          for (var i = 0; i < pts.length - 1; i++) {
+            var t = i / (pts.length - 1);
+            var w = Math.max(1.2, width * (1 - t * 0.75));
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = CONFIG.colors.crackLine;
+            ctx.lineWidth = w;
+            ctx.beginPath();
+            ctx.moveTo(pts[i][0], pts[i][1]);
+            ctx.lineTo(pts[i + 1][0], pts[i + 1][1]);
+            ctx.stroke();
+            ctx.strokeStyle = CONFIG.colors.crackGlow;
+            ctx.lineWidth = Math.max(1, w * 0.4);
+            ctx.beginPath();
+            ctx.moveTo(pts[i][0] - 1, pts[i][1] - 1);
+            ctx.lineTo(pts[i + 1][0] - 1, pts[i + 1][1] - 1);
+            ctx.stroke();
+          }
+        };
+
+        var branch = (x0, y0, angle, length, depth, width) => {
+          var segments = 3 + Math.floor(rand() * 2);
+          var x = x0, y = y0;
+          var pts = [[x, y]];
+          for (var i = 0; i < segments; i++) {
+            angle += (rand() - 0.5) * 0.9;
+            var segLen = length / segments;
+            x += Math.cos(angle) * segLen;
+            y += Math.sin(angle) * segLen;
+            pts.push([x, y]);
+            // depth < 3 (was < 2): one extra fork generation makes a denser,
+            // more dramatic shatter instead of a few lone lines.
+            if (depth < 3 && rand() < 0.6 && i > 0) {
+              branch(x, y, angle + (rand() < 0.5 ? -1 : 1) * (0.6 + rand() * 0.5), length * 0.5, depth + 1, width * 0.6);
+            }
+          }
+          drawTaperedPath(pts, width);
+        };
+
+        // Bigger base widths (11/9, was 6/5) and longer reach (0.46/0.38,
+        // was 0.38/0.3) so the crack fills most of the decal instead of a
+        // thin scribble lost in the middle of it.
+        var baseAngle = rand() * Math.PI * 2;
+        branch(cx, cy, baseAngle, size * 0.46, 0, 11);
+        branch(cx, cy, baseAngle + Math.PI, size * 0.38, 0, 9);
+
+        var img = document.createElement('img');
+        img.id = 'crackDecal' + this.instanceId + '_' + seed;
+        img.src = canvas.toDataURL();
+        return img;
       },
 
-      hideCrackDecal: function () {
-        this.crackDecal.setAttribute('visible', false);
+      showCrackDecal: function (index) {
+        this.crackDecals[index].setAttribute('visible', true);
+      },
+
+      hideCrackDecals: function () {
+        this.crackDecals.forEach((d) => d.setAttribute('visible', false));
       },
 
       // ~120 orbiting points around Copito's body, one THREE.Points buffer
@@ -924,9 +1268,14 @@
         ctx.fillRect(0, 0, 128, 128);
 
         var img = document.createElement('img');
-        img.id = 'blobShadow';
+        img.id = 'blobShadow' + this.instanceId;
         img.src = canvas.toDataURL();
         return img;
+      },
+
+      remove: function () {
+        var idx = copitoRegistry.indexOf(this);
+        if (idx !== -1) copitoRegistry.splice(idx, 1);
       }
     });
   </script>

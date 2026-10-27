@@ -460,6 +460,103 @@ note below for how the two steps meet.
   headset** (hit reactions and the landed pile from real trigger throws,
   not scripted ones) — same outstanding item as step 3.
 
+**Step 4 follow-up round (same session, after Vincent's first look):** four
+issues reported against the above, all fixed:
+
+1. **Hitbox missed the head/hat.** The "hit" check was a single sphere
+   centered on Copito's root (his feet), radius 0.5 — anything above ~0.5m
+   (most of the body) was outside it. Changed to a capsule: horizontal
+   distance (unchanged 0.5 radius) + a height range from the ground to
+   `snowmanHeight + hitHeightMargin`. Now covers him head-to-foot.
+2. **Crack decal looked disconnected from the moving body**, and once fixed,
+   the first crack read great but the second one didn't. Two separate
+   causes:
+   - The decal was parented to the outer, non-animated entity while all of
+     Copito's own animation (bob/sway, and the new squash/wobble) applies to
+     a different, inner node — so the crack just sat still while the body
+     moved under it. Fixed by parenting the decals **inside** the model
+     wrapper itself (`copito.worldToModelLocal` converts an authored
+     "el-local meters" position into the wrapper's raw/pre-scale local
+     space once, at build time), so they now inherit every animation
+     automatically through the normal object3D parent-child hierarchy —
+     no per-frame syncing code needed.
+   - Separately, while debugging that, found and fixed a **real bug**: the
+     new hit-wobble/squash was rotating and scaling the model wrapper
+     directly, but the wrapper's own local origin (an artifact of the
+     glTF's messy raw export transform, see `copitoOffset`'s comment) sits
+     far from the visible mesh. Rotating/scaling around it swung Copito's
+     whole body sideways by up to ~0.5m instead of wobbling in place —
+     confirmed by sampling world position before/after in-browser. Fixed by
+     adding `hitPivot`, a plain, well-centered rotation/scale point
+     (`CONFIG.hitPivotHeight`, roughly mid-body) that the model wrapper
+     nests inside; squash/wobble now apply to `hitPivot`, while the
+     pre-existing idle bob/sway stay exactly as they were on the model
+     wrapper (untouched, to avoid regressing already-approved behavior).
+     After the fix, displacement during a full-amplitude wobble dropped
+     from ~0.5m to ~0.05m in testing.
+   - The "crack 2 looks worse" complaint itself turned out to be the two
+     decals' glow halos overlapping (crackSize was bumped up for
+     visibility, see next point, and the glow radius was a fraction of
+     that size, so it grew right along with it) — crack 1's wide halo was
+     bleeding across and washing out crack 2. Fixed by tightening the glow
+     radius fractions so each crack's halo hugs its own lines instead of
+     flooding the whole decal plane; confirmed visually afterward that both
+     read as distinct, legible fractures at normal viewing distance.
+3. **Crack asked to be bigger/more impactful:** `CONFIG.crackSize` raised
+   (0.42 → 0.75), line widths and branch reach increased, and an extra
+   "core" glow layer added on top of the outer halo for a punchier look —
+   balanced against the overlap fix above so it stays readable with
+   several cracks on screen at once.
+4. **Snowballs landing at the same spot now stack vertically** instead of
+   overlapping flat on the ground (`snowball-thrower.land`/`findStackBase`:
+   a landing within `CONFIG.landedStackRadius` of an existing pile snaps
+   onto its current top instead of ground level). Cap raised to 12 (top of
+   Vincent's requested 10-12 range, for a more satisfying pile) and pool
+   size bumped 12 → 16 so flying/cooldown balls still have slots once the
+   ground is full. **One real consequence found and fixed:** evicting the
+   *oldest* landed ball once over the cap, when that ball happens to be
+   buried at the base of a tall single-spot stack, would otherwise cascade
+   and collapse the *entire* pile at once (confirmed in testing: 13 throws
+   at one exact spot dropped the count from 12 straight to 0). Fixed by
+   making cap-eviction (`evictForCap`) always target the oldest ball that's
+   currently the *top* of its own pile, never a buried one — a tall stack
+   now caps out gracefully instead of periodically collapsing. A separate
+   `freeLanded` (cascade-on-removal) is kept for the other path where a
+   slot genuinely has no choice but to be reused (the pool's round-robin
+   landing on an occupied slot in `spawn()`), so nothing is ever left
+   visually floating.
+
+**Two more requests folded in as "future-proofing" (no new user-facing
+feature built, just removed two single-instance assumptions that would
+otherwise block this later):**
+
+- **Scalable "lives":** `CONFIG.hitsToExplode` (default 3, lives up to a
+  tested 7) now drives the crack system directly — `generateCrackPositions
+  (count)` procedurally lays out `hitsToExplode - 1` crack decals around a
+  widening front arc (no more hardcoded two-position list), and
+  `onHit`'s squash/wobble amplitude ramps via `lerp` across
+  `hitSquashAmplitudeRange`/`hitWobbleAmplitudeRange` instead of a
+  fixed 2-entry table indexed by hit number. Verified in-browser with
+  `hitsToExplode` temporarily set to 7: 6 cracks generated, each revealed
+  one at a time across 6 hits, clean reset on the 7th, zero console errors.
+  **Not built:** an actual bigger-snowman visual variant for the higher
+  end of that range — Vincent explicitly said not to build that yet, this
+  just keeps the hit/crack code from having to be reworked when it happens.
+- **Multiple snowmen on the map:** `snowball-thrower` no longer hardcodes
+  `#copito` as the one hit target. Every `copito` component instance
+  registers itself into a module-level `copitoRegistry` on init (and
+  deregisters in `remove()`); the thrower's capsule hit-check
+  (`findHitSnowman`) loops that registry and emits `snowball-hit` on
+  whichever snowman was actually hit. Also fixed a latent id collision that
+  would have bitten this immediately: the blob-shadow and crack-decal
+  `<img>` assets used fixed ids (`#blobShadow`, `#crackDecal0`) — a second
+  snowman would have silently reused the first one's textures via DOM id
+  collision. Each `copito` instance now gets a unique `instanceId`
+  (`copitoInstanceCounter`) and namespaces its own asset ids with it.
+  **Not built:** actually placing more than one snowman entity in the
+  scene — that's a content/placement change for whenever it's wanted, not
+  a code change, now that the lookup side is generic.
+
 <details>
 <summary>Original step 4 brief (superseded by the DONE notes above)</summary>
 
