@@ -23,7 +23,7 @@
   </div>
   <a-scene renderer="antialias: true; colorManagement: true; foveationLevel: 1"
            fog="type: linear; color: #aab0b8; near: 4.5; far: 7.9"
-           snowball-thrower>
+           snowball-thrower wave-director>
     <!--
       antialias: smooths jagged edges, cheap enough on Quest 2 at this triangle budget.
       colorManagement: keeps colors consistent between the sRGB textures (sky photo) and
@@ -82,7 +82,9 @@
     <a-entity light="type: hemisphere; color: #CFEFFF; groundColor: #9aa5ad; intensity: 0.9"></a-entity>
     <a-entity light="type: directional; color: #FFF1D6; intensity: 0.7" position="2 4 1"></a-entity>
 
-    <a-entity id="copito" copito position="0 0 -5"></a-entity>
+    <!-- No static snowman entity here anymore: wave-director (step 5 bis)
+         owns a pool of `copito` entities and activates/positions them per
+         wave. See wave-director's class comment below. -->
 
     <!-- Step 3: hand controllers for Quest, snowball pool + ballistic throw,
          and a per-source dotted aim arc. meta-touch-controls is the current
@@ -261,6 +263,30 @@
       // point in el-local meters, roughly mid-body height, with no such
       // baggage -- see the hitPivot setup in copito.init.
       hitPivotHeight: 0.8,
+
+      // Wave director (step 5 bis, new -- not in the original spec): spawn
+      // points are sampled in a band inside the fog-clear zone (<a-scene>'s
+      // fog far: 7.9, above) and well inside the ground disc (<a-circle>'s
+      // radius: 9.5, above), in a frontal arc around wherever the camera is
+      // currently facing (not a fixed world angle, so this still works if
+      // the player ever gains locomotion -- see wave-director's class
+      // comment). Arc widens once several snowmen spawn in the same wave so
+      // they don't crowd directly in front of each other.
+      waveMinSpawnRadius: 3,
+      waveMaxSpawnRadius: 7,
+      waveMinSeparation: 1.4,        // meters between simultaneous spawn points in one wave
+      waveArcNarrowDeg: 70,          // frontal arc for a single-snowman wave
+      waveArcWideDeg: 150,           // frontal arc once several snowmen spawn at once
+      waveMaxConcurrentSnowmen: 8,   // cap once past the authored WAVE_TABLE (see getWaveConfig)
+      waveIntermissionDelay: 2.5,    // seconds of calm between a wave clearing and the next starting
+      waveDestroyBonusPerLife: 10,   // score per "life" (hitsToExplode) on a kill -- a type-7 kill is worth more than a type-1
+      waveClearBonus: 50,
+      // Soft, low-stakes time bonus for clearing a wave quickly -- no fail
+      // state, no countdown UI, per the user ("could be soft time but not
+      // too exigent... nor important for now"). Decays linearly to 0, never
+      // negative.
+      waveSoftTimerBonusMax: 30,
+      waveSoftTimerDecayPerSecond: 1,
 
       // Sound volumes 0 to 1 (step 6)
       volume: {
@@ -704,6 +730,93 @@
     var copitoInstanceCounter = 0; // unique id source for per-instance asset ids, see copito.init
 
     // ---------------------------------------------------------------------
+    // WAVE_TABLE / getWaveConfig: the data-driven wave table wave-director
+    // walks through. Each row is {count, types}; `types` picks each
+    // snowman's "lives" via the existing 1/3/5/7 hitsToExplode system
+    // (CRACK_MASTER_ORDER/getCrackSlotsForLives above), reused per-instance
+    // -- no new toughness mechanic needed. Waves 1-2 are a single type-1
+    // snowman each (teaches that the spawn position varies); from wave 3 on
+    // several snowmen spawn at once and the mix gets tougher, not just the
+    // count. Not a hard cap: once the authored rows run out, getWaveConfig
+    // keeps generating further waves procedurally instead of looping back
+    // or stopping (per the user: the table "just keeps going if wanted
+    // later").
+    // ---------------------------------------------------------------------
+    var WAVE_TABLE = [
+      { count: 1, types: [1] },
+      { count: 1, types: [1] },
+      { count: 2, types: [1, 1] },
+      { count: 2, types: [1, 3] },
+      { count: 3, types: [1, 1, 3] },
+      { count: 3, types: [1, 3, 3] },
+      { count: 4, types: [1, 1, 3, 5] },
+      { count: 4, types: [3, 3, 5, 5] },
+      { count: 5, types: [1, 3, 3, 5, 5] },
+      { count: 5, types: [3, 5, 5, 7, 1] }
+    ];
+
+    function getWaveConfig(index) {
+      if (index < WAVE_TABLE.length) return WAVE_TABLE[index];
+
+      // Past the authored table: count keeps creeping up (capped at
+      // waveMaxConcurrentSnowmen so the pool/scene don't grow unbounded),
+      // and the type mix skews tougher the further past the table we go.
+      var beyond = index - WAVE_TABLE.length + 1;
+      var lastRow = WAVE_TABLE[WAVE_TABLE.length - 1];
+      var count = Math.min(lastRow.count + Math.floor(beyond / 2), CONFIG.waveMaxConcurrentSnowmen);
+      var toughPool = [1, 3, 5, 7];
+      var toughBias = Math.min(toughPool.length, 2 + Math.floor(beyond / 4));
+      var types = [];
+      for (var i = 0; i < count; i++) {
+        types.push(toughPool[Math.floor(Math.random() * toughBias)]);
+      }
+      return { count: count, types: types };
+    }
+
+    // ---------------------------------------------------------------------
+    // pickSpawnPoints: rejection-sampling spawn placement for one wave.
+    // Independent of wave-director itself so it's reusable elsewhere later
+    // (per the plan). Points land in a radius band (waveMinSpawnRadius to
+    // waveMaxSpawnRadius) around `origin`, inside a frontal arc centered on
+    // `forward` (widens with `n`, see waveArcNarrowDeg/waveArcWideDeg), with
+    // a minimum separation between points placed in the same call so
+    // simultaneous snowmen don't overlap or crowd one spot. `origin` and
+    // `forward` are read from the live camera at call time (not a fixed
+    // world constant), so this keeps working if/when the player gains
+    // locomotion -- today, with a stationary player, that's equivalent to
+    // the old hardcoded snowmanDistance.
+    // ---------------------------------------------------------------------
+    function pickSpawnPoints(n, origin, forward) {
+      var THREE = AFRAME.THREE;
+      var flatForward = new THREE.Vector3(forward.x, 0, forward.z);
+      if (flatForward.lengthSq() < 0.0001) flatForward.set(0, 0, -1);
+      flatForward.normalize();
+
+      var arcDeg = n <= 1 ? CONFIG.waveArcNarrowDeg : CONFIG.waveArcWideDeg;
+      var minR = CONFIG.waveMinSpawnRadius, maxR = CONFIG.waveMaxSpawnRadius;
+      var up = new THREE.Vector3(0, 1, 0);
+      var points = [];
+
+      for (var i = 0; i < n; i++) {
+        var candidate = null;
+        // A handful of rejection-sampling attempts honoring minSeparation;
+        // if none land clear (a crowded wave in a narrow arc), the last
+        // attempt is kept anyway rather than silently spawning fewer
+        // snowmen than the wave asked for.
+        for (var attempt = 0; attempt < 30; attempt++) {
+          var angle = (Math.random() * 2 - 1) * THREE.MathUtils.degToRad(arcDeg / 2);
+          var radius = minR + Math.random() * (maxR - minR);
+          var dir = flatForward.clone().applyAxisAngle(up, angle);
+          candidate = new THREE.Vector3(origin.x + dir.x * radius, 0, origin.z + dir.z * radius);
+          var tooClose = points.some((p) => candidate.distanceTo(p) < CONFIG.waveMinSeparation);
+          if (!tooClose) break;
+        }
+        points.push(candidate);
+      }
+      return points;
+    }
+
+    // ---------------------------------------------------------------------
     // CRACK_MASTER_ORDER / CRACK_SLOTS / getCrackSlotsForLives: the user's
     // reference sketch -- six possible crack "slots", each a fixed crossing
     // angle/sweep/group, all one shared glow color (CONFIG.colors.crackGlow).
@@ -879,6 +992,19 @@
           this.scratchDir.copy(this.raycaster.ray.direction);
         }
 
+        // Guards against a one-frame-only condition seen in testing: on the
+        // very first tick, before the camera's projection matrix has a real
+        // (non-zero) canvas size to work from, Raycaster.setFromCamera can
+        // momentarily unproject to a non-finite direction. Writing that into
+        // the dots buffer would be a one-time cosmetic console error (THREE
+        // caches a geometry's boundingSphere once computed, NaN or not, so
+        // a single bad write lingers as a permanent warning even though
+        // every later frame's data is fine) -- skip this frame instead.
+        if (!isFinite(this.scratchOrigin.x) || !isFinite(this.scratchDir.x)) {
+          this.setVisible(false);
+          return;
+        }
+
         this.setVisible(true);
         this.updateDots();
       },
@@ -925,6 +1051,138 @@
     });
 
     // ---------------------------------------------------------------------
+    // wave-director (step 5 bis, new -- not in the original spec): lives on
+    // <a-scene>. Turns the single always-present snowman into a wave-based
+    // level: waves 1-2 spawn one snowman each at a different point; from
+    // wave 3 on, several spawn at once and the mix gets tougher (see
+    // WAVE_TABLE/getWaveConfig above). Reacts only to the
+    // 'snowman-destroyed' event `copito` already emits (step 4's contract,
+    // reused again here) and the new 'snowman-cleared' event (emitted once
+    // a managed snowman's explosion fx are fully done, see
+    // copito.updateRespawnTimer) -- never reaches into copito's internals
+    // beyond reading its `hitsToExplode` for scoring.
+    //
+    // Owns a pool of `copito` entities, keyed by type (hitsToExplode),
+    // created lazily and reused across waves by activating/deactivating
+    // them (copito.activateForWave) rather than creating/destroying DOM
+    // nodes per wave -- same no-create/destroy-per-use budget as every
+    // other pool in this file (snowball pool, explosion chunks, etc.), and
+    // it sidesteps having to tear down a managed instance's own per-type
+    // three.js objects (chunk InstancedMeshes, burst Points, explosion
+    // PointLight) that live directly on the scene's object3D.
+    // ---------------------------------------------------------------------
+    AFRAME.registerComponent('wave-director', {
+      // No tick() here on purpose -- every state change this component
+      // cares about is event- or timer-driven (a kill, a cleared pool slot,
+      // an intermission timeout), never a per-frame update, so there's
+      // nothing a tick() would buy it. Timing runs on performance.now() and
+      // setTimeout instead (see startWave/scheduleNextWave).
+      init: function () {
+        this.waveIndex = -1;
+        this.score = 0;
+        this.aliveThisWave = 0;
+        this.waveStartAt = 0;
+        this.pools = {}; // hitsToExplode -> [{el, inUse}], see getPoolEntity
+
+        this.el.addEventListener('snowman-destroyed', (evt) => this.onSnowmanDestroyed(evt));
+        this.el.addEventListener('snowman-cleared', (evt) => this.onSnowmanCleared(evt));
+
+        // Deferred a macrotask past init (not called directly here):
+        // startWave appends new DOM entities (the pool, see
+        // getPoolEntity), and this component's own init() still runs
+        // synchronously during the scene's initial attach pass, before the
+        // first real frame -- the same early-timing window that caused the
+        // camera race above. A plain setTimeout(0) reliably lands after it.
+        setTimeout(() => this.startWave(0), 0);
+      },
+
+      // Finds a free pool entity of the given type, or grows that type's
+      // pool by one if every existing one is currently in use.
+      getPoolEntity: function (type) {
+        if (!this.pools[type]) this.pools[type] = [];
+        var pool = this.pools[type];
+        for (var i = 0; i < pool.length; i++) {
+          if (!pool[i].inUse) return pool[i];
+        }
+        var el = document.createElement('a-entity');
+        el.setAttribute('copito', 'hitsToExplode: ' + type + '; managed: true');
+        var entry = { el: el, inUse: false };
+        el.wavePoolEntry = entry; // so onSnowmanCleared can free the right entry
+        this.el.appendChild(el);
+        pool.push(entry);
+        return entry;
+      },
+
+      // Positions + activates a pool entry's copito instance. Newly created
+      // entries haven't finished attaching their component yet (A-Frame
+      // initializes a dynamically appended entity's components
+      // asynchronously), so this waits for 'loaded' the first time; reused
+      // entries are already loaded and activate immediately.
+      activateEntry: function (entry, position) {
+        var activate = () => entry.el.components.copito.activateForWave(position);
+        if (entry.el.hasLoaded) activate();
+        else entry.el.addEventListener('loaded', activate, { once: true });
+      },
+
+      startWave: function (index) {
+        this.waveIndex = index;
+        this.waveStartAt = performance.now();
+        var waveCfg = getWaveConfig(index);
+
+        var camera = this.el.camera;
+        var origin = new AFRAME.THREE.Vector3(0, 0, 0);
+        var forward = new AFRAME.THREE.Vector3(0, 0, -1);
+        if (camera) {
+          camera.updateMatrixWorld();
+          camera.getWorldPosition(origin);
+          camera.getWorldDirection(forward);
+        }
+        origin.y = 0;
+
+        var points = pickSpawnPoints(waveCfg.count, origin, forward);
+
+        this.aliveThisWave = waveCfg.count;
+        for (var i = 0; i < waveCfg.count; i++) {
+          var type = waveCfg.types[i % waveCfg.types.length];
+          var entry = this.getPoolEntity(type);
+          entry.inUse = true;
+          this.activateEntry(entry, points[i]);
+        }
+
+        console.log('[wave-director] wave ' + (index + 1) + ' started: ' +
+          waveCfg.count + ' snowman(s), types [' + waveCfg.types.join(',') + ']');
+      },
+
+      // Scoring + wave-clear detection happen immediately on the kill
+      // (not deferred to when that snowman's explosion fx finish) so the
+      // next wave's intermission starts counting right away.
+      onSnowmanDestroyed: function (evt) {
+        var component = evt.target.components && evt.target.components.copito;
+        if (!component) return;
+        this.score += CONFIG.waveDestroyBonusPerLife * component.hitsToExplode;
+        this.aliveThisWave--;
+        if (this.aliveThisWave <= 0) this.scheduleNextWave();
+      },
+
+      // A managed snowman's explosion fx have fully finished and it's back
+      // to being hidden/inert (see copito.updateRespawnTimer) -- free its
+      // pool slot so a later wave can reuse it.
+      onSnowmanCleared: function (evt) {
+        var entry = evt.target.wavePoolEntry;
+        if (entry) entry.inUse = false;
+      },
+
+      scheduleNextWave: function () {
+        var secondsTaken = (performance.now() - this.waveStartAt) / 1000;
+        var softBonus = Math.max(0, CONFIG.waveSoftTimerBonusMax - secondsTaken * CONFIG.waveSoftTimerDecayPerSecond);
+        this.score += CONFIG.waveClearBonus + softBonus;
+        console.log('[wave-director] wave ' + (this.waveIndex + 1) + ' cleared, score ' + Math.round(this.score));
+        var nextIndex = this.waveIndex + 1;
+        setTimeout(() => this.startWave(nextIndex), CONFIG.waveIntermissionDelay * 1000);
+      }
+    });
+
+    // ---------------------------------------------------------------------
     // copito: builds Copito's look (this step) and will own his idle
     // animation and hit state (next steps).
     //
@@ -936,8 +1194,22 @@
     // effects instead of animating individual sub-parts.
     // ---------------------------------------------------------------------
     AFRAME.registerComponent('copito', {
+      // hitsToExplode: per-instance override of CONFIG.hitsToExplode (0
+      // means "use the CONFIG default"), so wave-director (step 5 bis) can
+      // give different snowmen different "lives" from the same wave table.
+      // managed: true for entities owned by wave-director's pool -- see
+      // activateForWave/deactivateManaged and updateRespawnTimer's branch.
+      // A managed snowman starts (and stays, between waves) hidden and
+      // non-alive until the director activates it, and does not
+      // self-respawn in place after exploding like a standalone one does.
+      schema: {
+        hitsToExplode: { type: 'int', default: 0 },
+        managed: { default: false }
+      },
+
       init: function () {
         var el = this.el;
+        this.hitsToExplode = this.data.hitsToExplode || CONFIG.hitsToExplode;
 
         // Unique per-instance id, used to namespace dynamically-created
         // <img> asset ids (blob shadow, crack textures) below -- with a
@@ -1028,6 +1300,16 @@
         this.buildExplosionBurst();
         this.buildExplosionLight();
         this.el.addEventListener('snowman-destroyed', (evt) => this.startExplosion(evt.detail.point));
+
+        // Managed entities (wave-director's pool, step 5 bis) start hidden
+        // and inert -- they only come alive once the director calls
+        // activateForWave() the first time, same as between-wave reuse.
+        if (this.data.managed) {
+          this.alive = false;
+          this.hitPivot.object3D.visible = false;
+          this.shadow.object3D.visible = false;
+          this.sparkles.visible = false;
+        }
       },
 
       // copitoOffset/copitoScale correct the glTF's own messy raw-export
@@ -1137,20 +1419,20 @@
 
         // 0 at hit 1, 1 at the last hit before the explosion -- how far
         // along the escalation this hit is, for the amplitude ramps below.
-        var crackStages = Math.max(1, CONFIG.hitsToExplode - 1);
+        var crackStages = Math.max(1, this.hitsToExplode - 1);
         var progress = Math.min(this.hitCount - 1, crackStages - 1) / Math.max(1, crackStages - 1);
 
         this.squashImpulse.time = time;
         this.squashImpulse.amplitude = lerp(CONFIG.hitSquashAmplitudeRange[0], CONFIG.hitSquashAmplitudeRange[1], progress);
 
-        if (this.hitCount < CONFIG.hitsToExplode) {
+        if (this.hitCount < this.hitsToExplode) {
           this.wobbleImpulse.time = time;
           this.wobbleImpulse.amplitude = lerp(CONFIG.hitWobbleAmplitudeRange[0], CONFIG.hitWobbleAmplitudeRange[1], progress);
           var crackIndex = this.hitCount - 1;
           if (this.crackDecals[crackIndex]) this.showCrackDecal(crackIndex);
         }
 
-        if (this.hitCount >= CONFIG.hitsToExplode) {
+        if (this.hitCount >= this.hitsToExplode) {
           this.el.emit('snowman-destroyed', { point: detail.point });
         }
       },
@@ -1256,7 +1538,7 @@
       // they move with every body animation, same reasoning as the
       // original flat-decal version: see worldToModelLocal's comment.
       buildCrackDecals: function () {
-        this.activeCrackSlots = getCrackSlotsForLives(CONFIG.hitsToExplode);
+        this.activeCrackSlots = getCrackSlotsForLives(this.hitsToExplode);
         this.crackDecals = this.activeCrackSlots.map((slotKey) => this.buildCrackDecal(slotKey));
       },
 
@@ -1663,11 +1945,24 @@
       },
 
       // Runs only while explosionState === 'exploding' (see tick). Once
-      // CONFIG.respawnDelay has elapsed, shows the body again and starts
-      // the pop-scale animation (updateRespawnPop) rather than snapping
-      // straight back to full size.
+      // CONFIG.respawnDelay has elapsed: a standalone snowman shows its
+      // body again and starts the pop-scale animation (updateRespawnPop)
+      // rather than snapping straight back to full size. A managed one
+      // (wave-director's pool, step 5 bis) instead stays hidden/non-alive
+      // and just signals it's free to be reused -- the director decides
+      // if/when/where it comes back via activateForWave, not this
+      // component on its own.
       updateRespawnTimer: function (time) {
         if (time - this.explosionStartTime < CONFIG.respawnDelay * 1000) return;
+
+        if (this.data.managed) {
+          this.explosionState = 'idle';
+          this.hitCount = 0;
+          this.hideCrackDecals();
+          this.el.emit('snowman-cleared');
+          return;
+        }
+
         this.explosionState = 'respawning';
         this.respawnStartTime = time;
         this.hitPivot.object3D.visible = true;
@@ -1695,6 +1990,25 @@
         this.alive = true;
         this.hitCount = 0; // deferred here from onHit so the destroyed body stays visible for the full respawnDelay
         this.destroyedCount++; // step 7's HUD will read this later
+      },
+
+      // wave-director's activation call (step 5 bis), for a managed entity
+      // only: places it at a fresh spawn point and brings it fully back to
+      // a clean "just spawned" state, whether this is its very first
+      // activation (still hidden/non-alive from init) or a reuse after a
+      // previous wave's death (left hidden/non-alive by updateRespawnTimer
+      // above). Mirrors finishRespawn's state reset plus the position set a
+      // standalone snowman never needed (it's placed once, in the HTML).
+      activateForWave: function (position) {
+        this.el.object3D.position.set(position.x, position.y, position.z);
+        this.hitCount = 0;
+        this.alive = true;
+        this.explosionState = 'idle';
+        this.hitPivot.object3D.scale.set(1, 1, 1);
+        this.hitPivot.object3D.visible = true;
+        this.shadow.object3D.visible = true;
+        this.sparkles.visible = true;
+        this.hideCrackDecals();
       },
 
       // ~120 orbiting points around Copito's body, one THREE.Points buffer
