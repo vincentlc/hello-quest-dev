@@ -100,7 +100,7 @@
               trajectory-preview="source: hand"></a-entity>
 
     <a-entity camera position="0 1.6 0" look-controls wasd-controls
-              trajectory-preview="source: desktop"></a-entity>
+              trajectory-preview="source: desktop" wave-hud></a-entity>
   </a-scene>
 
   <script>
@@ -267,16 +267,25 @@
       // Wave director (step 5 bis, new -- not in the original spec): spawn
       // points are sampled in a band inside the fog-clear zone (<a-scene>'s
       // fog far: 7.9, above) and well inside the ground disc (<a-circle>'s
-      // radius: 9.5, above), in a frontal arc around wherever the camera is
+      // radius: 9.5, above), in an arc around wherever the camera is
       // currently facing (not a fixed world angle, so this still works if
       // the player ever gains locomotion -- see wave-director's class
-      // comment). Arc widens once several snowmen spawn in the same wave so
-      // they don't crowd directly in front of each other.
+      // comment). The arc widens with snowman count: small waves stay
+      // frontal (so an early/easy wave doesn't surprise a new player from
+      // behind), but once a wave is big enough (waveArcFullThreshold) it
+      // opens to a full circle -- copito.updateFacing() means every
+      // snowman still turns to face the player regardless of where it
+      // spawned, so there's no risk of one spawning with its back turned;
+      // the only effect of a wider arc is that the player has to actually
+      // turn and check their surroundings on a tough wave, which is the
+      // point.
       waveMinSpawnRadius: 3,
       waveMaxSpawnRadius: 7,
       waveMinSeparation: 1.4,        // meters between simultaneous spawn points in one wave
       waveArcNarrowDeg: 70,          // frontal arc for a single-snowman wave
-      waveArcWideDeg: 150,           // frontal arc once several snowmen spawn at once
+      waveArcWideDeg: 150,           // frontal arc for a small multi-snowman wave
+      waveArcFullDeg: 360,           // full circle -- can spawn behind the player
+      waveArcFullThreshold: 5,       // snowman count at/above which the full-circle arc kicks in
       waveMaxConcurrentSnowmen: 8,   // cap once past the authored WAVE_TABLE (see getWaveConfig)
       waveIntermissionDelay: 2.5,    // seconds of calm between a wave clearing and the next starting
       waveDestroyBonusPerLife: 10,   // score per "life" (hitsToExplode) on a kill -- a type-7 kill is worth more than a type-1
@@ -329,21 +338,28 @@
 
     // ---------------------------------------------------------------------
     // I18N: every piece of visible text, Spanish first (default language).
+    // LANG picks which one is live -- no language switcher yet (step 7's
+    // job), so this is the one place to change it by hand for now.
     // ---------------------------------------------------------------------
     var I18N = {
       es: {
         instructionVR: '¡Apunta y aprieta el gatillo para lanzar bolas de nieve!',
         instructionDesktop: 'Haz clic para lanzar',
         hits: 'Golpes',
-        destroyed: 'Muñecos destruidos'
+        destroyed: 'Muñecos destruidos',
+        wave: 'Oleada',
+        score: 'Puntos'
       },
       en: {
         instructionVR: 'Aim and pull the trigger to throw snowballs!',
         instructionDesktop: 'Click to throw',
         hits: 'Hits',
-        destroyed: 'Snowmen destroyed'
+        destroyed: 'Snowmen destroyed',
+        wave: 'Wave',
+        score: 'Score'
       }
     };
+    var LANG = 'es';
 
     // ---------------------------------------------------------------------
     // DesktopAim: live mouse position in normalized device coordinates
@@ -780,9 +796,11 @@
     // pickSpawnPoints: rejection-sampling spawn placement for one wave.
     // Independent of wave-director itself so it's reusable elsewhere later
     // (per the plan). Points land in a radius band (waveMinSpawnRadius to
-    // waveMaxSpawnRadius) around `origin`, inside a frontal arc centered on
-    // `forward` (widens with `n`, see waveArcNarrowDeg/waveArcWideDeg), with
-    // a minimum separation between points placed in the same call so
+    // waveMaxSpawnRadius) around `origin`, inside an arc centered on
+    // `forward` that widens with `n` -- frontal-only for a small wave, a
+    // full circle (can spawn behind the player) once `n` reaches
+    // waveArcFullThreshold, see those CONFIG values' own comment -- with a
+    // minimum separation between points placed in the same call so
     // simultaneous snowmen don't overlap or crowd one spot. `origin` and
     // `forward` are read from the live camera at call time (not a fixed
     // world constant), so this keeps working if/when the player gains
@@ -795,7 +813,8 @@
       if (flatForward.lengthSq() < 0.0001) flatForward.set(0, 0, -1);
       flatForward.normalize();
 
-      var arcDeg = n <= 1 ? CONFIG.waveArcNarrowDeg : CONFIG.waveArcWideDeg;
+      var arcDeg = n <= 1 ? CONFIG.waveArcNarrowDeg :
+        n >= CONFIG.waveArcFullThreshold ? CONFIG.waveArcFullDeg : CONFIG.waveArcWideDeg;
       var minR = CONFIG.waveMinSpawnRadius, maxR = CONFIG.waveMaxSpawnRadius;
       var up = new THREE.Vector3(0, 1, 0);
       var points = [];
@@ -1154,6 +1173,7 @@
 
         console.log('[wave-director] wave ' + (index + 1) + ' started: ' +
           waveCfg.count + ' snowman(s), types [' + waveCfg.types.join(',') + ']');
+        this.emitState();
       },
 
       // Scoring + wave-clear detection happen immediately on the kill
@@ -1164,7 +1184,18 @@
         if (!component) return;
         this.score += CONFIG.waveDestroyBonusPerLife * component.hitsToExplode;
         this.aliveThisWave--;
+        this.emitState();
         if (this.aliveThisWave <= 0) this.scheduleNextWave();
+      },
+
+      // One small event, fired whenever waveIndex or score changes
+      // (wave start, a kill, a wave-clear bonus) -- the HUD (wave-hud,
+      // below) listens on this same scene element rather than polling it
+      // every frame. Kept to a single event name/shape so any later
+      // display (step 7's real HUD) can reuse it without wave-director
+      // needing to know who's listening.
+      emitState: function () {
+        this.el.emit('wave-state-changed', { waveIndex: this.waveIndex, score: this.score });
       },
 
       // A managed snowman's explosion fx have fully finished and it's back
@@ -1180,8 +1211,59 @@
         var softBonus = Math.max(0, CONFIG.waveSoftTimerBonusMax - secondsTaken * CONFIG.waveSoftTimerDecayPerSecond);
         this.score += CONFIG.waveClearBonus + softBonus;
         console.log('[wave-director] wave ' + (this.waveIndex + 1) + ' cleared, score ' + Math.round(this.score));
+        this.emitState();
         var nextIndex = this.waveIndex + 1;
         setTimeout(() => this.startWave(nextIndex), CONFIG.waveIntermissionDelay * 1000);
+      }
+    });
+
+    // ---------------------------------------------------------------------
+    // wave-hud: a minimal, head-locked HUD -- a small wave/score text
+    // panel, so there's *some* answer to "where's the level/score" in VR
+    // (a 2D page overlay like #credit isn't visible inside the headset).
+    // Goes on the camera entity: as its child, the text panel inherits the
+    // camera's transform every frame for free, no per-frame positioning
+    // code needed, the same way trajectory-preview's hand dots inherit
+    // their source entity's transform.
+    //
+    // Deliberately placed low and off-center (see the position below), not
+    // dead-center in view: a panel locked to the exact center of a VR
+    // headset's view is the classic "head-locked UI" discomfort case (no
+    // parallax, feels pasted onto your eyeballs rather than part of the
+    // world) -- peripheral placement reads more like a corner HUD in a
+    // normal game. This is intentionally the *small* version per the
+    // user's ask; step 7 owns the full HUD (i18n-complete, accent-glyph
+    // checked, multi-language) this will likely be folded into or replaced
+    // by.
+    //
+    // No tick() here either, same reasoning as wave-director: this only
+    // needs to change when wave-director's own 'wave-state-changed' event
+    // says something actually changed, never on a per-frame basis.
+    // ---------------------------------------------------------------------
+    AFRAME.registerComponent('wave-hud', {
+      init: function () {
+        this.panel = document.createElement('a-entity');
+        this.panel.setAttribute('position', '0.55 -0.35 -1.2');
+        this.panel.setAttribute('text', {
+          value: '',
+          align: 'right',
+          width: 1.4,
+          color: '#FFFFFF',
+          baseline: 'top'
+        });
+        this.el.appendChild(this.panel);
+
+        var attach = () => {
+          this.el.sceneEl.addEventListener('wave-state-changed', (evt) => this.updateText(evt.detail));
+        };
+        if (this.el.sceneEl.hasLoaded) attach();
+        else this.el.sceneEl.addEventListener('loaded', attach);
+      },
+
+      updateText: function (detail) {
+        var lang = I18N[LANG];
+        this.panel.setAttribute('text', 'value',
+          lang.wave + ' ' + (detail.waveIndex + 1) + '\n' + lang.score + ': ' + Math.round(detail.score));
       }
     });
 

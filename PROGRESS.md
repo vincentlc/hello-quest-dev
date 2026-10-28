@@ -1066,15 +1066,61 @@ three requests, all folded into the same branch:
    arc, anything off-angle would otherwise show its side/back by default.
    Verified in-browser across a 6-snowman wave (type mix `[3,5,5,7,7,7]`,
    wide arc) -- every spawn point reads front-on in the screenshot.
-3. **How to show wave/score in VR, asked but not yet built:** recommended
-   a world-space HUD anchored to the camera entity (plain A-Frame
-   `<a-text>`/plane, fixed local offset so it follows head movement) since
-   a 2D page overlay (like the existing `#credit` div) isn't visible inside
-   the headset -- this is exactly what step 7 ("HUD + i18n") below already
-   covers, including the VR-comfort caveat (don't lock it dead-center;
-   peripheral placement avoids the head-locked-UI nausea issue). Not
-   implemented this round -- the user was asking for an approach, not
-   requesting the build yet.
+3. **How to show wave/score in VR, asked but not yet built (this round):**
+   recommended a world-space HUD anchored to the camera entity since a 2D
+   page overlay (like the existing `#credit` div) isn't visible inside the
+   headset -- this is step 7's ("HUD + i18n") job in full, but the user
+   asked for a small version of it now; see the next follow-up round below
+   for the actual build.
+
+**Step 5 bis follow-up round 2 (same session, after trying it again):** two
+more requests:
+
+1. **Spawn arc now opens to a full circle on big waves, so snowmen can
+   appear behind the player.** New `CONFIG.waveArcFullDeg` (360) and
+   `waveArcFullThreshold` (5): `pickSpawnPoints`'s arc selection is now
+   three-tier (narrow for 1, wide for 2-4, full circle for 5+) instead of
+   the original two-tier narrow/wide split. Directly answers the user's
+   "snowmen don't appear behind me, is that normal?" -- yes, that was the
+   original frontal-arc-only design; this is the improvement they asked
+   for. Safe to do specifically *because* of the previous round's
+   `copito.updateFacing()`: every snowman turns to face the player
+   regardless of spawn angle, so a behind-the-player spawn never shows its
+   back -- the player just has to notice/turn around, which is the
+   intended difficulty bump, not a visual bug. Kept frontal for small
+   waves on purpose (an early/easy wave shouldn't ambush a new player from
+   behind). Verified in-browser: jumping to the 7-snowman wave showed 6 of
+   9 alive snowmen behind the camera's forward direction (checked via dot
+   product against camera forward), and turning the camera 180 degrees
+   visually confirmed two of them, both already correctly facing the
+   player.
+2. **Minimal head-locked HUD, built this round.** New `wave-hud` component
+   on the camera entity: a plain `<a-entity text="...">` child positioned
+   at `0.55 -0.35 -1.2` (lower-right of view, not dead-center -- the
+   head-locked-UI discomfort case the earlier recommendation was built to
+   avoid) showing `"<Oleada N>\n<Puntos: X>"`. Updates are event-driven,
+   not polled: `wave-director` gained a single `emitState()` helper
+   (`this.el.emit('wave-state-changed', {waveIndex, score})`), called
+   after every state change (wave start, a kill, a wave-clear bonus)
+   instead of giving `wave-hud` its own `tick()` -- keeps the "no
+   unnecessary tick()-bearing components" lesson from this step's own NaN
+   debugging story intact, and means the text only actually updates on a
+   real change. `I18N` gained `wave`/`score` keys (es: "Oleada"/"Puntos",
+   en: "Wave"/"Score") and a new module-level `LANG` constant (`'es'`, no
+   switcher yet -- that's step 7's job) picks which one is live; this is
+   the first thing in the file that actually reads from `I18N`, which
+   until now was declared but unused. Explicitly the *small* version per
+   the user's own phrasing -- no i18n switcher, no accent-glyph check
+   (both step 7), no lives/hits-remaining display, no styling beyond plain
+   white text. Verified in-browser: score updates immediately on a kill,
+   wave number updates after the next `startWave()`, and turning the
+   camera 180 degrees after jumping to the full-circle wave above showed
+   snowmen correctly placed and facing the camera from behind, with the
+   HUD still reading correctly throughout. Zero console errors.
+- **Not yet tested:** an actual Quest 2 headset, same outstanding item as
+  every step since step 3 -- the head-locked HUD's comfort in particular
+  needs real headset judgment, not just the "don't lock it dead-center"
+  guideline followed here.
 
 **Step 6 — sound + haptics: not started.** Same access problem as the sky
 image is likely for Kenney/Freesound — the user will probably need to
