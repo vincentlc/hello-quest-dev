@@ -1,0 +1,9 @@
+/* Required CC-BY credit for the snowman model (see ASSETS.md). Only
+   visible on the 2D page (not inside the headset view) -- a matching
+   in-scene credit line is added with the HUD in a later step so it's
+   visible in VR too. */
+#credit {
+  position: fixed; bottom: 6px; left: 8px; z-index: 9999;
+  font: 11px sans-serif; color: #fff; text-shadow: 0 1px 2px #000;
+  opacity: 0.8; max-width: 90vw;
+}
