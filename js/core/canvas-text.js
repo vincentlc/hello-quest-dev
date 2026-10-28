@@ -61,6 +61,7 @@ export function createTextPlane(opts) {
 
   function setText(text, overrideOpts) {
     var o = Object.assign({}, baseOpts, overrideOpts || {});
+    var canvasResized = false;
 
     var fontSize = (o.fontSize || Math.round(canvas.height * 0.14 / RESOLUTION_SCALE)) * RESOLUTION_SCALE;
     var lineHeight = fontSize * 1.3;
@@ -120,6 +121,7 @@ export function createTextPlane(opts) {
       if (newCanvasHeight !== canvas.height) {
         var oldGeometryHeight = mesh.geometry.parameters.height;
         canvas.height = newCanvasHeight;
+        canvasResized = true;
         var newGeometryHeight = (o.height || baseOpts.height) * newCanvasHeight / baseCanvasHeight;
         mesh.geometry.dispose();
         mesh.geometry = new THREE.PlaneGeometry(o.width || baseOpts.width, newGeometryHeight);
@@ -160,6 +162,14 @@ export function createTextPlane(opts) {
       ctx.fillText(line, x, startY + i * lineHeight);
     });
 
+    if (canvasResized) {
+      var previousTexture = texture;
+      texture = new THREE.CanvasTexture(canvas);
+      texture.anisotropy = 8;
+      mesh.material.map = texture;
+      mesh.material.needsUpdate = true;
+      previousTexture.dispose();
+    }
     texture.needsUpdate = true;
   }
 

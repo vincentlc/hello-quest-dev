@@ -1904,6 +1904,8 @@ at wave 7. Implemented in `js/components/wave-director.js`:
   original compact text size when there is no bonus notice; it expands
   vertically while the bonus breakdown is displayed, then returns to its
   compact size after five seconds at most (or when the next wave begins).
+  When the canvas height changes, its Three.js texture is recreated so the
+  expanded bonus text is uploaded at the new dimensions.
 
 The per-wave throw and hit counters reset at each wave; a dedicated
 `snowball-hit-registered` event carries the throw ID and is emitted before
