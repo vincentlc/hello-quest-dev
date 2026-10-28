@@ -39,11 +39,11 @@ for console errors and FPS.
 ## Tuning
 
 Tunable values live in `js/config.js`; visible text lives in `js/i18n.js`.
-Each snowman type uses a bright hat and a white hit-count number painted on
-the front of the hat; the original source texture remains unchanged. Type 7
-is scaled to 2x. Type-5/7 snowmen have a 60% chance of spawning in the outer
-fog band. Three throws start a run; five throws restart after the credits
-screen.
+Each snowman type uses a bright hat and a white hit-count number painted
+upright and mirror-corrected on the front of the hat, twice its previous
+size; the original source texture remains unchanged. Type 7 is scaled to
+2x. Type-5/7 snowmen have a 60% chance of spawning in the outer fog band.
+Three throws start a run; five throws restart after the credits screen.
 
 ## Credits
 
