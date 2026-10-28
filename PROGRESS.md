@@ -5,7 +5,7 @@ project — it has everything learned so far that isn't obvious from the code,
 so you don't need to re-derive it (and re-spend tokens doing so).
 
 Original spec: `~/Documents/Claude_folder/Meta_quest_coaniquem/02_plans/snowman_demo_prompt.md`
-(the full work order — lives outside this repo, in Vincent's planning
+(the full work order — lives outside this repo, in the user's planning
 folder, not duplicated here). This file tracks what changed from it, what's
 done, and what's next.
 
@@ -67,7 +67,7 @@ numbers:
 6. **General web access for Claude's own tools is narrow in this
    environment** (small CDN allowlist only — see "Environment facts" above)
    — don't assume a direct asset URL is fetchable; confirm or go straight to
-   asking Vincent to download it himself.
+   asking the user to download it themselves.
 7. **WebXR secure-context nuance:** `localhost` (that exact hostname, not a
    LAN IP) counts as secure over plain HTTP, in both desktop Chrome and the
    Quest browser. Seeing "Access this site over HTTPS..." on desktop with no
@@ -107,10 +107,10 @@ the step-by-step status.
   **`WebFetch` and `WebSearch` tools still work** for any site (they return
   text/analysis, not raw bytes) — use them for research/lookups.
 - **Practical consequence:** any new binary asset (image, audio, model) from
-  a site other than the CDN allowlist needs Vincent to download it himself in
-  his own browser and save it under this project folder. Since Claude Code
-  and Vincent are on the same machine, no upload/share step is needed —
-  just ask him to save to an exact path and it's immediately readable.
+  a site other than the CDN allowlist needs the user to download it themselves in
+  their own browser and save it under this project folder. Since Claude Code
+  and the user are on the same machine, no upload/share step is needed —
+  just ask them to save to an exact path and it's immediately readable.
 - **Local preview server:** `.claude/launch.json` in this repo has a
   `"snowman-demo"` config that runs `python3 -m http.server 8080` right here
   at the repo root. Use the Browser pane's `preview_start` with
@@ -127,10 +127,10 @@ the step-by-step status.
   extra setup), useful if more HDRIs are needed. No Blender, no FBX
   converters, no `imageio`/`OpenEXR` Python packages.
 
-## Deviations from the original spec (all approved by Vincent)
+## Deviations from the original spec (all approved by the user)
 
 1. **Copito's body is a CC-BY glTF model, not CC0 hand-built primitives.**
-   Vincent provided it (Sketchfab "Snowman" by alixor22). This is now the
+   The user provided it (Sketchfab "Snowman" by alixor22). This is now the
    *one* non-CC0 asset — see `ASSETS.md` for the required credit text, which
    is already shown in two places: `ASSETS.md` and a small on-page corner
    div in `index.html` (`#credit`). **Still owed:** an in-scene credit line
@@ -169,7 +169,7 @@ the step-by-step status.
 2. **Sky image sourcing took a different path than planned.** Ended up using
    **Passendorf Snow** (not Bergen — Bergen's snow wasn't visually obvious
    enough once in-scene) from Poly Haven. Poly Haven's download page only
-   offered HDR/EXR for this asset (no JPG), so Vincent downloaded the **HDR**
+   offered HDR/EXR for this asset (no JPG), so the user downloaded the **HDR**
    at 4K (matches our target 4096x2048 exactly) and it was tone-mapped
    locally with OpenCV (`cv2.createTonemapReinhard`, gamma 2.2) to
    `assets/sky/sky.jpg` (0.88 MB, well under the 3 MB budget). Full method
@@ -191,7 +191,7 @@ the step-by-step status.
    between `far` and `radius` (about 1.6m currently) is deliberate, see the
    buffer-margin lesson below.
 
-   Iterated several times with Vincent to get here: first pass (40x40
+   Iterated several times with the user to get here: first pass (40x40
    square, flat color, far fog distances) worked but felt too big/distant;
    shrinking it straight to a tight fog band (radius right at `far`, no
    buffer) caused a visible bright seam/hard edge twice over (once from a
@@ -238,7 +238,7 @@ console errors as of this writing).
   `idleBobPeriod`, `idleSwayAmplitude`, `idleSwayPeriod`.
 - Blink: **skipped** (option (a) from the brief). Tried it visually with
   just bob+sway+sparkles running and it already reads as alive; not building
-  the fake-eyelid-overlay hack unless Vincent flags it as needed.
+  the fake-eyelid-overlay hack unless the user flags it as needed.
 - Crown shimmer: dropped, not applicable (hat, not a crystal crown).
 - Sparkles (120 orbiting points): one `THREE.Points` buffer geometry
   (`copito.buildSparkles`/`updateSparkles`), attached to the outer `el`'s
@@ -318,7 +318,7 @@ DONE.**
   fully verified, same as step 1's "zero console errors" bar but for VR
   input this time.
 
-**Step 3 follow-up fix (separate session, after Vincent tried it on-device):
+**Step 3 follow-up fix (separate session, after the user tried it on-device):
 aim direction was wrong.** Throws and the hand trajectory arc pointed
 straight down (out of the bottom of the controller, parallel to the cable)
 instead of out in front like a laser pointer. Root cause, confirmed by
@@ -448,7 +448,7 @@ note below for how the two steps meet.
     offset (`copitoOffset`) already puts that origin near the ground, and a
     true head-height pivot would need extra pivot-point math for a fused
     mesh with no separable parts. Reads fine as "shaken" in testing; revisit
-    only if Vincent flags it as too subtle/wrong-feeling in VR.
+    only if the user flags it as too subtle/wrong-feeling in VR.
   - Hit 3: per the event contract, emits `snowman-destroyed` on `#copito`
     (step 5's hook) and, since step 5's explosion/respawn isn't built yet,
     resets `hitCount` to 0 and hides the crack decal immediately rather than
@@ -501,7 +501,7 @@ note below for how the two steps meet.
   headset** (hit reactions and the landed pile from real trigger throws,
   not scripted ones) — same outstanding item as step 3.
 
-**Step 4 follow-up round (same session, after Vincent's first look):** four
+**Step 4 follow-up round (same session, after the user's first look):** four
 issues reported against the above, all fixed:
 
 1. **Hitbox missed the head/hat.** The "hit" check was a single sphere
@@ -552,7 +552,7 @@ issues reported against the above, all fixed:
    overlapping flat on the ground (`snowball-thrower.land`/`findStackBase`:
    a landing within `CONFIG.landedStackRadius` of an existing pile snaps
    onto its current top instead of ground level). Cap raised to 12 (top of
-   Vincent's requested 10-12 range, for a more satisfying pile) and pool
+   the user's requested 10-12 range, for a more satisfying pile) and pool
    size bumped 12 → 16 so flying/cooldown balls still have slots once the
    ground is full. **One real consequence found and fixed:** evicting the
    *oldest* landed ball once over the cap, when that ball happens to be
@@ -581,7 +581,7 @@ otherwise block this later):**
   `hitsToExplode` temporarily set to 7: 6 cracks generated, each revealed
   one at a time across 6 hits, clean reset on the 7th, zero console errors.
   **Not built:** an actual bigger-snowman visual variant for the higher
-  end of that range — Vincent explicitly said not to build that yet, this
+  end of that range — the user explicitly said not to build that yet, this
   just keeps the hit/crack code from having to be reworked when it happens.
 - **Multiple snowmen on the map:** `snowball-thrower` no longer hardcodes
   `#copito` as the one hit target. Every `copito` component instance
@@ -598,9 +598,9 @@ otherwise block this later):**
   scene — that's a content/placement change for whenever it's wanted, not
   a code change, now that the lookup side is generic.
 
-**Step 4 crack redesign (same session, after Vincent shared a hand-drawn
+**Step 4 crack redesign (same session, after the user shared a hand-drawn
 reference):** replaced the crack system entirely with a "snowman type"
-model, per a hand-drawn sketch Vincent shared (crossing curved bands, not
+model, per a hand-drawn sketch the user shared (crossing curved bands, not
 flat jagged fracture decals).
 
 - **Only four valid types: 1, 3, 5, or 7 lives** (`CONFIG.hitsToExplode`).
@@ -619,14 +619,14 @@ flat jagged fracture decals).
   producing a broken half-pair).
 - **Every active crack crosses through the same central point** on the
   torso (`CONFIG.crackCenter`), not spread to different spots -- matching
-  Vincent's sketch, where all the lines cross near the belly. This also
+  the user's sketch, where all the lines cross near the belly. This also
   simplified the code a lot versus the previous per-crack-position
   generator: since all decals share one position, only the *texture* needs
   to differ per slot (drawn at `CRACK_SLOTS[slot].angle`), not the plane's
   world transform. Decals are nudged a hair apart in z (0.002 model-local
   units per slot) purely to avoid z-fighting between coplanar planes --
   visually imperceptible.
-- **Curved sweep, not jagged fracture.** Vincent confirmed the original
+- **Curved sweep, not jagged fracture.** The user confirmed the original
   hit-1 crack's curve/arc was good and a flat decal plane (not a true 3D
   band wrapping the body, confirmed not needed) is sufficient. Rewrote
   `makeCrackTexture` to draw one smooth quadratic-bezier stroke through the
@@ -650,10 +650,10 @@ flat jagged fracture decals).
 - **Not yet tested:** an actual Quest 2 headset, same outstanding item as
   every step since step 3.
 
-**Step 4 crack redesign, round 2 (same session, after Vincent reviewed the
+**Step 4 crack redesign, round 2 (same session, after the user reviewed the
 first redesign against a screenshot):** three more issues, all fixed:
 
-1. **Color.** Vincent wanted the original cyan/glow look back (not the
+1. **Color.** The user wanted the original cyan/glow look back (not the
    red/amber/pink/green/blue-per-slot palette from redesign round 1). All
    six slots now share one color (`CONFIG.colors.crackCore` '#0A2A28' /
    `crackGlow` '#7DF9FF'), restored into `CONFIG.colors` after having been
@@ -707,7 +707,7 @@ first redesign against a screenshot):** three more issues, all fixed:
    `CONFIG.crackUpperCenter`/`crackUpperRadius`) cross at a separate, lower
    point spanning roughly chin-height down to the top of the scarf, clear
    of both the eyes and the hat.
-- **Process note:** Vincent asked to see a rendered preview before each
+- **Process note:** The user asked to see a rendered preview before each
   round of changes landed in the file. Delivered by live-patching the
   already-loaded page in the browser (mutating `CRACK_SLOTS`/CONFIG,
   rebuilding the affected crack meshes, screenshotting) rather than editing
@@ -723,8 +723,8 @@ first redesign against a screenshot):** three more issues, all fixed:
 - **Not yet tested:** an actual Quest 2 headset, same outstanding item as
   every step since step 3.
 
-**Step 4 crack redesign, round 3 (same session, after Vincent compared the
-round-2 result against an older reference screenshot):** he wanted the
+**Step 4 crack redesign, round 3 (same session, after the user compared the
+round-2 result against an older reference screenshot):** they wanted the
 cracks "broader... a bit more longer to the boarder" and the shine back to
 how an earlier in-browser prototype looked ("glowing, super good") rather
 than the round-2 version, which read as flatter. Root cause and fix:
@@ -743,7 +743,7 @@ than the round-2 version, which read as flatter. Root cause and fix:
    live-patching the loaded page (building one prototype ribbon with the
    gradient texture before touching `index.html`) and only ported into the
    real `copito.buildCrackDecal`/`buildCrackRibbonMesh` once the live
-   result matched what Vincent had asked for.
+   result matched what the user had asked for.
 2. **Broader + longer:** `CONFIG.crackCoreWidth`/`crackGlowWidth`/
    `crackGlowOpacity` (two separate widths for the old two-mesh approach)
    collapsed into one `CONFIG.crackWidth: 0.09` (up from the old
@@ -762,7 +762,7 @@ than the round-2 version, which read as flatter. Root cause and fix:
   toggling decals) for type 3 — hit 1 shows slot 1 only, hit 2 adds slot 2,
   hit 3 fires `snowman-destroyed` and resets `hitCount`/hides all decals —
   each state screenshotted and visually matching the broader/glowing look
-  Vincent approved; type 7 checked separately with all six slots shown at
+  the user approved; type 7 checked separately with all six slots shown at
   once to confirm the wider sweep doesn't make them collide awkwardly.
 - **Lesson:** debugging a camera framing issue during this round's
   screenshot testing (a hand-rolled test camera facing backwards despite a
@@ -869,7 +869,7 @@ step 4 merged (`#3`), so the branch history is linear.
   `destroyedCount` increments on `finishRespawn` — no HUD to show it yet
   (step 7's job), but the count isn't lost.
 - **`respawnDelay` lowered from the spec's 2.5s default to 1.5s** at
-  Vincent's request after a first look — felt slow. `respawnPopDuration`
+  the user's request after a first look — felt slow. `respawnPopDuration`
   left at 0.6s.
 - **Debugging note, logged so a future session doesn't re-chase this:** a
   `THREE.BufferGeometry.computeBoundingSphere(): Computed radius is NaN`
@@ -903,10 +903,72 @@ step 4 merged (`#3`), so the branch history is linear.
   actual Quest 2 headset** — same outstanding item as every step since
   step 3, plus the comfort-rule caveat above.
 
+**Step 5 bis — wave/level director (new, not in the original spec): planned,
+not started.** Designed with the user this session; the build hasn't begun.
+Logged here so a future session can pick this up without re-deriving the
+design.
+
+- **What it's for:** today there's exactly one snowman, always in the same
+  spot. This turns that into a wave-based level system — waves 1 and 2
+  spawn a single snowman each (same mechanic, different spawn point each
+  time, to teach that the position varies); from wave 3 on, multiple
+  snowmen spawn simultaneously and the count scales up (2, 3, 4, 5...).
+  The user's own example went up to 5 but explicitly said that's not a hard
+  cap — the table just keeps going if wanted later.
+- **Data-driven wave table, not branching code:** an ordered array of
+  `{count, types}` rows. `types` picks each snowman's `hitsToExplode` via
+  the existing 1/3/5/7 "lives" system from step 4 — no new mechanic needed,
+  just reused per-instance. Early waves use type 1 (fast, builds
+  confidence); later waves mix in 3/5/7 for variety and pacing, not just
+  raw count.
+- **New `wave-director` component** (likely on `<a-scene>`) is the only new
+  piece — everything else it touches already exists:
+  - Owns the wave index, an alive-this-wave counter, and score. Reacts only
+    to the `snowman-destroyed` event `copito` already emits (step 4's
+    contract, reused again here) — never reaches into
+    `copito`/`snowball-thrower` internals directly.
+  - On wave start: asks a spawn-placement utility for N points, activates N
+    `copito` instances there via the existing `copitoRegistry` pattern
+    (step 4's multi-snowman future-proofing — confirmed in this session's
+    design pass that it was built exactly for this and needs no changes).
+  - On each `snowman-destroyed`: adds a destroy bonus scaled by that
+    snowman's `hitsToExplode` (a type-7 kill is worth more than a type-1),
+    decrements the counter; at zero, adds a wave-clear bonus (plus a small,
+    intentionally low-stakes soft-timer bonus — no fail state, no countdown
+    UI, per the user: "could be soft time but not too exigent... nor
+    important for now") and starts the next row.
+- **Spawn placement rules** (a new utility, independent of the director so
+  it's reusable elsewhere later): radius band roughly 3-7m from the player
+  (inside the fog-clear zone, `fog far: 7.9`, and well inside the ground
+  disc, `radius: 9.5`); a frontal arc rather than full 360°, narrower on
+  early waves and wider once a wave has several simultaneous snowmen;
+  minimum separation between points placed in the same wave so simultaneous
+  snowmen don't overlap or crowd one spot. Implemented as rejection
+  sampling — pick a radius+angle, retry if it's too close to an existing
+  point or past the edge/fog margin.
+- **Deliberately written to be player-movement-compatible even though the
+  player is stationary for now** (the user: "for now stationary, let's see
+  in the future"): every spawn point is computed from the camera's *live*
+  world position/facing at spawn time, never from a fixed world constant —
+  the same pattern step 5's `biasAwayFromCamera` already uses for explosion
+  chunk direction. Today that's equivalent to the old hardcoded
+  `snowmanDistance = -5` since the camera never moves, but nothing here
+  needs rework if/when the player gains locomotion later.
+- **Explicitly out of scope for this step: snowmen actually moving toward
+  the player.** The design reserves a `state` field and a `moveSpeed` (0
+  for now) per snowman, and reuses the same minimum-radius bound as a
+  future "stop distance," but no movement code is planned yet — just not
+  blocked by this step either.
+- **Planned build order (not started):** its own branch off `main` (not a
+  numbered original-spec step), in two layers so each is testable on its
+  own — (1) spawn placement + multi-snowman activation with a hardcoded
+  test wave, no scoring/auto-advance yet; (2) the director loop (wave
+  table, death counting, auto-advance, scoring) on top of (1).
+
 **Step 6 — sound + haptics: not started.** Same access problem as the sky
-image is likely for Kenney/Freesound — Vincent will probably need to
-download the Kenney Impact Sounds zip and the Freesound wind clip himself
-(same workaround: his browser, save to this project folder, Claude reads it
+image is likely for Kenney/Freesound — the user will probably need to
+download the Kenney Impact Sounds zip and the Freesound wind clip themselves
+(same workaround: their browser, save to this project folder, Claude reads it
 directly). Planned sourcing (from earlier planning, still valid): Kenney
 `impactSoft_medium_000.ogg` + `footstep_snow_000.ogg` (hit 1),
 `impactSoft_heavy_000.ogg` + `impactGlass_light_000.ogg` (hit 2),
@@ -933,7 +995,7 @@ same way it already describes `snow-canyon` as "a separate git repo...kept
 outside this folder". Still outstanding, don't forget it. Final no-em-dash
 grep check across all authored files before calling this done.
 
-## Open judgment calls for Vincent (not yet decided)
+## Open judgment calls for the user (not yet decided)
 
 - Ground is now textured + circular + mirror-tiled and considered settled
-  for now; revisit only if Vincent flags something specific about it.
+  for now; revisit only if the user flags something specific about it.

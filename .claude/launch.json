@@ -6,7 +6,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "cd /home/vincent/Documents/Code/GitHub/hello-quest-dev && python3 -m http.server 8080"
+        "python3 -m http.server 8080"
       ],
       "port": 8080
     }

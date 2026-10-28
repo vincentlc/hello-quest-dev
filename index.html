@@ -227,7 +227,7 @@
       snowPuffSpeed: 1.3,
       snowPuffLifetime: 0.45,
 
-      // Crack decals (step 4): per Vincent's reference sketch, each active
+      // Crack decals (step 4): per the user's reference sketch, each active
       // crack is a curved band wrapping the body's roundness -- built as a
       // ribbon mesh of several short segments following an idealized
       // sphere approximating the torso (CRACK_MASTER_ORDER/CRACK_SLOTS has
@@ -250,7 +250,7 @@
       crackUpperCenter: { x: 0, y: 0.88, z: -0.02 },
       crackUpperRadius: 0.27,
       crackSamples: 20,      // points per curve -- smooths the ribbon
-      crackWidth: 0.09,      // meters -- broad, per Vincent's request
+      crackWidth: 0.09,      // meters -- broad, per the user's request
 
       // Hit squash/wobble (step 4) rotate/scale around this point instead
       // of the model wrapper's own raw origin. The wrapper's local origin
@@ -292,8 +292,8 @@
         sparkle: '#B8FFF4',
         snowball: '#F4FFFD',
         // Crack ribbons (step 4): one icy glow color, same across every
-        // slot (Vincent's call -- the earlier per-slot rainbow palette
-        // didn't match his reference). The gradient texture itself (see
+        // slot (the user's call -- the earlier per-slot rainbow palette
+        // didn't match their reference). The gradient texture itself (see
         // getCrackGlowTexture) fades this color out at the edges and up to
         // white-hot at the center, so no separate dark "core" color is
         // needed anymore.
@@ -698,13 +698,13 @@
     // single hardcoded `#copito` id, so multiple snowmen on the map later
     // is a matter of adding more entities, not touching the throw/hit code.
     // Not built/used for placing multiple snowmen yet -- just the lookup
-    // side made generic now, per Vincent's future-proofing request.
+    // side made generic now, per the user's future-proofing request.
     // ---------------------------------------------------------------------
     var copitoRegistry = [];
     var copitoInstanceCounter = 0; // unique id source for per-instance asset ids, see copito.init
 
     // ---------------------------------------------------------------------
-    // CRACK_MASTER_ORDER / CRACK_SLOTS / getCrackSlotsForLives: Vincent's
+    // CRACK_MASTER_ORDER / CRACK_SLOTS / getCrackSlotsForLives: the user's
     // reference sketch -- six possible crack "slots", each a fixed crossing
     // angle/sweep/group, all one shared glow color (CONFIG.colors.crackGlow).
     // Slots 1-4 cross through the torso's central point
