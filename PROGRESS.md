@@ -45,11 +45,13 @@ Keep that in mind before calling anything "done" in the VR-comfort sense.
 | 9 | Desktop turn controls (rotate, not strafe, on Left/Right) | ⬜ Not started |
 | 10 | Per-difficulty snowman textures + bigger type-7 | ⬜ Not started |
 | 11 | Landscape progression after wave 5 / wave 10 | ⬜ Not started |
+| 12 | Lose condition: snowmen approach + touch the player | ⬜ Not started |
 
-Steps 9-11 were scoped in a planning session on 2026-10-28; full
+Steps 9-12 were scoped in a planning session on 2026-10-28; full
 implementation detail for each lives inline in its own entry below in
 "Step-by-step status" — written so a cold session can execute directly from
-this file.
+this file. Step 12 ships in two phases, in this order: a standard/softer
+lives mechanic first, then a VR-comfort-oriented visual on top.
 
 ## Lessons learned (read before repeating a mistake)
 
@@ -1435,6 +1437,126 @@ under `assets/sky/`.
 **Verification:** jump `wave-director` directly to wave index 5 and 10 and
 screenshot to confirm the sky/ground/fog swap lands at the right point
 with no visible seam/fog mismatch.
+
+</details>
+
+<details>
+<summary><strong>Step 12 — lose condition: snowmen approach + touch the player (⬜ Not started)</strong></summary>
+
+**Scoped 2026-10-28, not yet implemented.** From a brainstorm on "what
+could make the player actually lose," evaluated against market-standard
+patterns plus one idea reusing a mechanic this project already has (see
+that brainstorm for the full list of options considered). The user chose
+to build two of those ideas, in this order: first the **standard, softer**
+option (a tower-defense-style "leak" costs a life, not instant death),
+then layer the **VR-comfort-oriented** option on top (a thematic
+"snow-blind" visual instead of a bare counter tick, so getting touched
+doesn't feel like a jarring ambush in a headset). Ship and verify phase 1
+before starting phase 2.
+
+**Correction to a loose note in Step 5 bis's history above:** that section
+says the wave-director design "reserves a `state` field and a `moveSpeed`
+(0 for now) per snowman" for future movement. Grepping the actual code
+while scoping this step found no such fields anywhere on `copito` or in
+`WAVE_TABLE` — that was design intent written down at the time, never
+actually coded. Phase 1 below builds movement from scratch; don't go
+looking for scaffolding that isn't there.
+
+### Phase 1 — standard, softer: lives instead of instant death
+
+**Files:** `index.html` — `CONFIG`, `copito` (new per-tick movement,
+alongside its existing `updateFacing()`), `wave-director` (new `lives`
+state, the event listener, HUD payload), `wave-hud`/`I18N`, and
+`WAVE_TABLE` (a new optional per-row flag).
+
+1. `CONFIG.snowmanApproachSpeed` (m/s, e.g. `0.5`) and
+   `CONFIG.meleeStopDistance` (e.g. `1.3`, comfortably inside the existing
+   `waveMinSpawnRadius`/`waveMaxSpawnRadius` band of 3-7m) and
+   `CONFIG.startingLives` (e.g. `3`).
+2. Gate approaching behind a per-wave flag rather than turning it on for
+   every snowman everywhere — extend `WAVE_TABLE` rows with an optional
+   `approach: true` (default/absent = stationary, today's behavior
+   unchanged) so early waves can stay put while the player is still
+   learning to throw, and approaching snowmen get introduced from
+   whichever wave the user wants to start the ramp — same escalating-
+   introduction pattern this file already uses for type-3 appearing by
+   wave 3, the full-circle spawn arc only at 5+ snowmen, etc. New `copito`
+   schema field `approaches: { default: false }`, set at
+   `activateForWave` time from that row flag.
+3. In `copito`'s existing per-tick `updateFacing()` (already computes the
+   horizontal direction to the live camera position every frame to turn
+   the model to face it) — when `this.data.approaches` is true, also
+   translate `el.object3D.position` toward the camera along that same
+   direction by `CONFIG.snowmanApproachSpeed * dt`, clamped so the
+   remaining distance never goes below `CONFIG.meleeStopDistance`. Once at
+   that distance, stop translating and emit a new event —
+   `snowman-reached-player` on the snowman's own `el` (detail: `{point}`,
+   same shape as the existing `snowman-hit`/`snowman-destroyed` contract)
+   — guarded so it only fires once per approach (not every tick while
+   sitting at the stop distance).
+4. `wave-director` listens for `snowman-reached-player` (same decoupled,
+   event-only pattern it already uses for `snowman-destroyed` — never
+   reaches into `copito` internals directly): decrements `this.lives`,
+   removes that snowman via the **existing** explosion/deactivation path
+   (reuse what phase-1 kill handling already calls — do not invent a
+   second removal path, to avoid a second way to leak a stale
+   `copitoRegistry`/pool entry) but skips the kill/score bonus, since the
+   player didn't earn this one. Calls the existing `emitState()` helper
+   afterward so the HUD updates immediately.
+5. HUD: add `lives` to `wave-state-changed`'s detail payload and to
+   `wave-hud`'s displayed text; new `I18N` keys (`lives`: es "Vidas", en
+   "Lives").
+6. Game over at `lives <= 0`: stop `wave-director` from scheduling further
+   waves, swap the HUD text to a game-over message (new `I18N` key), and
+   make sure no still-active approaching snowman keeps moving/scoring
+   after that point. Keep this minimal on purpose — no persistent save, no
+   real restart flow beyond reloading the page, matching the "soft, not
+   too exigent" spirit the user already asked for with the wave-clear
+   timer bonus back in step 5 bis.
+
+**Verification:** force a low `startingLives` (e.g. 1) and a fast
+`snowmanApproachSpeed`; confirm a snowman visibly walks in, stops exactly
+at `meleeStopDistance` without clipping into the camera, the life counter
+decrements and the HUD updates on touch, and that reaching 0 lives halts
+further waves. Separately confirm a snowman killed by throwing *before* it
+reaches melee range still awards the normal kill bonus and costs no life.
+
+### Phase 2 — VR-comfort-oriented: "snow-blind" touch feedback
+
+Builds on phase 1's `snowman-reached-player` event — only start this once
+phase 1 is working and verified.
+
+**Files:** `index.html` — new `snow-blind-overlay` component on the camera
+entity, `CONFIG`.
+
+1. A camera-attached overlay plane, using the same head-locked-to-camera
+   pattern `wave-hud`'s text entity already proves out, not world space.
+   On `snowman-reached-player`, fade its opacity in sharply then back out
+   over `CONFIG.snowBlindDuration` (e.g. `2.5`s), peaking at
+   `CONFIG.snowBlindPeakOpacity` (e.g. `0.85` — not fully opaque; the
+   player should still be able to see enough to react), instead of (or
+   layered with) phase 1's bare life-counter tick — the point is to make
+   getting touched read as a soft, thematic "snow in your face" moment
+   rather than an abrupt punishment, which matters more in a headset than
+   on a flat monitor.
+2. Texture: a frost/snow-splatter pattern painted once on a cached
+   `<canvas>` (reuse the same cached-canvas-texture technique already
+   built for the crack glow gradient, `getCrackGlowTexture`) rather than
+   sourcing a new image asset.
+3. Fade curve: reuse this project's existing decaying-impulse/easing
+   helpers (the same family already driving hit squash/wobble and the
+   respawn "pop") instead of inventing a new tweening approach.
+4. Optional, not required for a first pass: let the player clear it early
+   with a quick head-shake (a yaw delta over a short window) or a trigger
+   tap, for a sense of agency instead of just waiting out a timer. Skip
+   unless it's asked for — a pure timed fade already achieves the comfort
+   goal.
+
+**Verification:** trigger `snowman-reached-player` directly (same
+manual-event-emit technique already used to test `snowman-hit`/
+`snowman-destroyed` in earlier steps) and confirm the overlay fades in and
+back out over the camera view without blocking the HUD text or making the
+scene unreadable at peak opacity.
 
 </details>
 
