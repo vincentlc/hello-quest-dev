@@ -124,7 +124,7 @@ export default {
       // per-part anchor -- see this method's class comment.
       chunk.position.set(
         basePos.x + (Math.random() * 2 - 1) * 0.15,
-        basePos.y + Math.random() * CONFIG.snowmanHeight,
+        basePos.y + Math.random() * CONFIG.snowmanHeight * this.sizeScale,
         basePos.z + (Math.random() * 2 - 1) * 0.15
       );
       chunk.active = true;

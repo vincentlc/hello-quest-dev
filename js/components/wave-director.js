@@ -1,6 +1,8 @@
 import { CONFIG } from '../config.js';
 import { getWaveConfig } from '../data/wave-table.js';
 import { pickSpawnPoints } from '../core/spawn-placement.js';
+import { createTextPlane } from '../core/canvas-text.js';
+import { I18N, LANG } from '../i18n.js';
 
 // ---------------------------------------------------------------------
 // wave-director (step 5 bis, new -- not in the original spec): lives on
@@ -8,11 +10,9 @@ import { pickSpawnPoints } from '../core/spawn-placement.js';
 // level: waves 1-2 spawn one snowman each at a different point; from
 // wave 3 on, several spawn at once and the mix gets tougher (see
 // data/wave-table.js's WAVE_TABLE/getWaveConfig). Reacts only to the
-// 'snowman-destroyed' event `copito` already emits (step 4's contract,
-// reused again here) and the new 'snowman-cleared' event (emitted once
-// a managed snowman's explosion fx are fully done, see
-// snowman-explosion.js's updateRespawnTimer) -- never reaches into
-// copito's internals beyond reading its `hitsToExplode` for scoring.
+// 'snowman-destroyed' and 'snowman-cleared' events, plus the
+// snowball-thrower events used for accuracy scoring -- never reaches
+// into copito's internals beyond reading its hitsToExplode for scoring.
 //
 // Owns a pool of `copito` entities, keyed by type (hitsToExplode),
 // created lazily and reused across waves by activating/deactivating
@@ -24,32 +24,91 @@ import { pickSpawnPoints } from '../core/spawn-placement.js';
 // explosion PointLight) that live directly on the scene's object3D.
 // ---------------------------------------------------------------------
 AFRAME.registerComponent('wave-director', {
-  // No tick() here on purpose -- every state change this component
-  // cares about is event- or timer-driven (a kill, a cleared pool slot,
-  // an intermission timeout), never a per-frame update, so there's
-  // nothing a tick() would buy it. Timing runs on performance.now() and
-  // setTimeout instead (see startWave/scheduleNextWave).
+  // The only per-frame work is advancing the small pool of floating
+  // score popups. Wave state itself remains event- and timer-driven.
   init: function () {
     this.waveIndex = -1;
     this.score = 0;
     this.aliveThisWave = 0;
     this.waveStartAt = 0;
+    this.gameStarted = false;
+    this.waveThrows = 0;
+    this.waveHits = 0;
+    this.waveThrowIds = new Set();
+    this.waveHitIds = new Set();
+    this.waveDestroyScore = 0;
     this.pools = {}; // hitsToExplode -> [{el, inUse}], see getPoolEntity
+    this.buildScorePopups();
 
     this.el.addEventListener('snowman-destroyed', (evt) => this.onSnowmanDestroyed(evt));
     this.el.addEventListener('snowman-cleared', (evt) => this.onSnowmanCleared(evt));
-    // end-screen.js re-emits this once a snowball is thrown while the
-    // post-credits freeze is active (see scheduleNextWave below) --
-    // restart is just "start over at wave 1 with the score reset".
+    this.el.addEventListener('snowball-thrown', () => this.onSnowballThrown());
+    this.el.addEventListener('snowball-hit-registered', () => this.onSnowballHit());
+    this.el.addEventListener('start-game', () => this.startFirstWave());
     this.el.addEventListener('restart-game', () => this.restart());
+  },
 
-    // Deferred a macrotask past init (not called directly here):
-    // startWave appends new DOM entities (the pool, see
-    // getPoolEntity), and this component's own init() still runs
-    // synchronously during the scene's initial attach pass, before the
-    // first real frame -- the same early-timing window that caused the
-    // camera race above. A plain setTimeout(0) reliably lands after it.
-    setTimeout(() => this.startWave(0), 0);
+  buildScorePopups: function () {
+    this.scorePopups = [];
+    for (var i = 0; i < CONFIG.waveMaxConcurrentSnowmen; i++) {
+      var popup = createTextPlane({
+        width: 0.8,
+        height: 0.3,
+        canvasWidth: 768,
+        canvasHeight: 192,
+        color: '#FFF5A6',
+        fontSize: 72,
+        bold: true,
+        background: 'rgba(8, 39, 35, 0.88)',
+        backgroundRadius: 28
+      });
+      popup.mesh.visible = false;
+      popup.mesh.material.depthTest = false;
+      popup.mesh.material.depthWrite = false;
+      popup.mesh.material.fog = false;
+      this.el.object3D.add(popup.mesh);
+      this.scorePopups.push({ mesh: popup.mesh, setText: popup.setText, startedAt: 0 });
+    }
+  },
+
+  startFirstWave: function () {
+    if (this.gameStarted) return;
+    this.gameStarted = true;
+    this.startWave(0);
+  },
+
+  showScorePopup: function (snowman, text) {
+    var now = performance.now();
+    var popup = this.scorePopups.find((item) => !item.mesh.visible) ||
+      this.scorePopups.reduce((oldest, item) => item.startedAt < oldest.startedAt ? item : oldest);
+    snowman.el.object3D.getWorldPosition(popup.mesh.position);
+    popup.mesh.position.y += CONFIG.snowmanHeight * snowman.sizeScale + CONFIG.scorePopupHeight;
+    popup.startY = popup.mesh.position.y;
+    popup.mesh.material.opacity = 1;
+    popup.setText(text);
+    popup.startedAt = now;
+    popup.mesh.visible = true;
+  },
+
+  updateScorePopups: function () {
+    var camera = this.el.camera;
+    var now = performance.now();
+    for (var i = 0; i < this.scorePopups.length; i++) {
+      var popup = this.scorePopups[i];
+      if (!popup.mesh.visible) continue;
+      var age = (now - popup.startedAt) / 1000;
+      if (age >= CONFIG.scorePopupDuration) {
+        popup.mesh.visible = false;
+        continue;
+      }
+      popup.mesh.position.y = popup.startY + age * 0.2;
+      popup.mesh.material.opacity = 1 - age / CONFIG.scorePopupDuration;
+      if (camera) camera.getWorldQuaternion(popup.mesh.quaternion);
+    }
+  },
+
+  tick: function () {
+    this.updateScorePopups();
   },
 
   // Finds a free pool entity of the given type, or grows that type's
@@ -83,6 +142,11 @@ AFRAME.registerComponent('wave-director', {
   startWave: function (index) {
     this.waveIndex = index;
     this.waveStartAt = performance.now();
+    this.waveThrows = 0;
+    this.waveHits = 0;
+    this.waveThrowIds.clear();
+    this.waveHitIds.clear();
+    this.waveDestroyScore = 0;
     var waveCfg = getWaveConfig(index);
 
     var camera = this.el.camera;
@@ -95,7 +159,7 @@ AFRAME.registerComponent('wave-director', {
     }
     origin.y = 0;
 
-    var points = pickSpawnPoints(waveCfg.count, origin, forward);
+    var points = pickSpawnPoints(waveCfg.count, origin, forward, waveCfg.types);
 
     this.aliveThisWave = waveCfg.count;
     // Remembered for scheduleNextWave's time-bonus calc below --
@@ -120,10 +184,31 @@ AFRAME.registerComponent('wave-director', {
   onSnowmanDestroyed: function (evt) {
     var component = evt.target.components && evt.target.components.copito;
     if (!component) return;
-    this.score += CONFIG.waveDestroyBonusPerLife * component.hitsToExplode;
+    var points = CONFIG.waveDestroyBonusPerLife * component.hitsToExplode;
+    this.score += points;
+    this.waveDestroyScore += points;
+    var lang = I18N[LANG];
+    var hitLabel = component.hitsToExplode === 1 ? lang.hitLabelSingular : lang.hitLabel;
+    this.showScorePopup(component, component.hitsToExplode + ' ' + hitLabel + ': +' + points);
     this.aliveThisWave--;
     this.emitState();
     if (this.aliveThisWave <= 0) this.scheduleNextWave();
+  },
+
+  onSnowballThrown: function (evt) {
+    if (!this.gameStarted || this.aliveThisWave <= 0) return;
+    var throwId = evt.detail && evt.detail.throwId;
+    if (throwId === undefined || this.waveThrowIds.has(throwId)) return;
+    this.waveThrowIds.add(throwId);
+    this.waveThrows++;
+  },
+
+  onSnowballHit: function (evt) {
+    var throwId = evt.detail && evt.detail.throwId;
+    if (!this.gameStarted || this.aliveThisWave <= 0 ||
+        !this.waveThrowIds.has(throwId) || this.waveHitIds.has(throwId)) return;
+    this.waveHitIds.add(throwId);
+    this.waveHits++;
   },
 
   // One small event, fired whenever waveIndex or score changes
@@ -132,8 +217,12 @@ AFRAME.registerComponent('wave-director', {
   // polling it every frame. Kept to a single event name/shape so any
   // later display (step 7's real HUD) can reuse it without
   // wave-director needing to know who's listening.
-  emitState: function () {
-    this.el.emit('wave-state-changed', { waveIndex: this.waveIndex, score: this.score });
+  emitState: function (announcement) {
+    this.el.emit('wave-state-changed', {
+      waveIndex: this.waveIndex,
+      score: this.score,
+      announcement: announcement || ''
+    });
   },
 
   // A managed snowman's explosion fx have fully finished and it's back
@@ -145,24 +234,49 @@ AFRAME.registerComponent('wave-director', {
     if (entry) entry.inUse = false;
   },
 
-  // Soft time bonus, scaled to the wave's own size (step 7 improvement
-  // -- originally a flat budget regardless of snowman count, which
-  // unfairly squeezed later/bigger waves against the same clock as
-  // wave 1's single snowman). Each snowman in the wave grants
-  // `waveSoftTimerSecondsPerSnowman` seconds of "free" time before the
-  // bonus starts decaying, and raises the max bonus pool by
-  // `waveSoftTimerBonusPerSnowman` -- a 7-snowman wave can earn up to
-  // 7x a 1-snowman wave's bonus, with proportionally more time to earn
-  // it in, instead of competing for the exact same fixed pool/window.
+  // Bonuses begin at wave 5. The wave-clear and time rewards grow with
+  // each later wave; accuracy is added from wave 7 and scales with the
+  // proportion of thrown snowballs that hit.
   scheduleNextWave: function () {
-    var secondsTaken = (performance.now() - this.waveStartAt) / 1000;
-    var allowedSeconds = CONFIG.waveSoftTimerSecondsPerSnowman * this.waveSnowmanCount;
-    var maxBonus = CONFIG.waveSoftTimerBonusPerSnowman * this.waveSnowmanCount;
-    var overTime = Math.max(0, secondsTaken - allowedSeconds);
-    var softBonus = Math.max(0, maxBonus - overTime * CONFIG.waveSoftTimerDecayPerSecond);
-    this.score += CONFIG.waveClearBonus + softBonus;
+    var waveNumber = this.waveIndex + 1;
+    var clearBonus = 0;
+    var timeBonus = 0;
+    var accuracyBonus = 0;
+    var announcement = [];
+
+    if (waveNumber >= CONFIG.waveBonusStartWave) {
+      var wavesPastBonusStart = waveNumber - CONFIG.waveBonusStartWave;
+      var secondsTaken = (performance.now() - this.waveStartAt) / 1000;
+      var allowedSeconds = CONFIG.waveSoftTimerSecondsPerSnowman * this.waveSnowmanCount;
+      var maxTimeBonus = CONFIG.waveSoftTimerBonusPerSnowman * this.waveSnowmanCount;
+      var overTime = Math.max(0, secondsTaken - allowedSeconds);
+      var timeProgression = 1 + wavesPastBonusStart * CONFIG.waveTimeBonusIncreasePerWave;
+      clearBonus = CONFIG.waveClearBonus +
+        wavesPastBonusStart * CONFIG.waveClearBonusIncreasePerWave;
+      timeBonus = Math.round(Math.max(0,
+        maxTimeBonus - overTime * CONFIG.waveSoftTimerDecayPerSecond) * timeProgression);
+      announcement.push(I18N[LANG].waveBonus + ': +' + clearBonus);
+      if (timeBonus > 0) announcement.push(I18N[LANG].timeBonus + ': +' + timeBonus);
+
+      if (waveNumber >= CONFIG.waveEfficiencyStartWave) {
+        var accuracy = this.waveThrows > 0
+          ? Math.min(1, this.waveHits / this.waveThrows)
+          : 0;
+        var efficiencyPercent = Math.min(
+          CONFIG.waveEfficiencyBonusMax,
+          CONFIG.waveEfficiencyBonusBase +
+            (waveNumber - CONFIG.waveEfficiencyStartWave) *
+            CONFIG.waveEfficiencyBonusIncreasePerWave
+        );
+        accuracyBonus = Math.round(this.waveDestroyScore * efficiencyPercent * accuracy);
+        announcement.push(I18N[LANG].accuracyBonus + ' ' +
+          Math.round(accuracy * 100) + '%: +' + accuracyBonus);
+      }
+    }
+
+    this.score += clearBonus + timeBonus + accuracyBonus;
     console.log('[wave-director] wave ' + (this.waveIndex + 1) + ' cleared, score ' + Math.round(this.score));
-    this.emitState();
+    this.emitState(announcement.join('\n'));
 
     // Step 7: once the configured run length is cleared, freeze instead
     // of letting getWaveConfig keep generating waves forever -- hand off

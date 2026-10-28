@@ -29,7 +29,12 @@ export default {
     var isUpper = slot.group === 'upper';
     var centerCfg = isUpper ? CONFIG.crackUpperCenter : CONFIG.crackTorsoCenter;
     var radius = isUpper ? CONFIG.crackUpperRadius : CONFIG.crackTorsoRadius;
-    var center = new THREE.Vector3(centerCfg.x, centerCfg.y, centerCfg.z);
+    var center = new THREE.Vector3(
+      centerCfg.x * this.sizeScale,
+      centerCfg.y * this.sizeScale,
+      centerCfg.z * this.sizeScale
+    );
+    radius *= this.sizeScale;
 
     // Points + outward surface normals along an arc on an idealized
     // sphere (el-local meters) -- see CONFIG.crackTorsoCenter's
@@ -46,7 +51,7 @@ export default {
       curve.push({ point: center.clone().addScaledVector(dir, radius), normal: dir });
     }
 
-    var mesh = this.buildCrackRibbonMesh(curve, CONFIG.crackWidth);
+    var mesh = this.buildCrackRibbonMesh(curve, CONFIG.crackWidth * this.sizeScale);
     mesh.visible = false;
     this.model.object3D.add(mesh);
     return mesh;

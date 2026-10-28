@@ -25,8 +25,10 @@ not current.
 **Current step: Step 6 (sound + haptics) — not started.** Steps 1-5bis and
 7 are done (desktop/Browser-pane verified; see the caveat below). Step 7
 was picked up out of order (user request); 6 and 8 are still open. Steps
-9-11 are newly planned, not started, and not blocking 6-8 — pick them up
-whenever, each as its own branch + PR per `CLAUDE.md`.
+9, 11, and 12 remain open; step 10's implementation is complete, with
+rendered visual verification still pending. Step 13 is now implemented.
+These steps do not block 6-8 —
+pick them up whenever, each as its own branch + PR per `CLAUDE.md`.
 
 **Outstanding across every step since step 3:** none of this has been tried
 on a real Quest 2 headset yet — only desktop + the in-app Browser pane.
@@ -44,10 +46,10 @@ Keep that in mind before calling anything "done" in the VR-comfort sense.
 | 7 | HUD fix + welcome/credits screens + accent fallback | ✅ Done |
 | 8 | Performance pass + README/ASSETS.md + final docs grep | ⬜ Not started |
 | 9 | Desktop turn controls (rotate, not strafe, on Left/Right) | ⬜ Not started |
-| 10 | Per-difficulty snowman textures + bigger type-7 | ⬜ Not started |
+| 10 | Per-difficulty snowman textures + bigger type-7 + fog spawns | ✅ Implemented; rendered verification pending |
 | 11 | Landscape progression after wave 5 / wave 10 | ⬜ Not started |
 | 12 | Lose condition: snowmen approach + touch the player | ⬜ Not started |
-| 13 | Scoring: accuracy bonus | ⬜ Not started |
+| 13 | Scoring: accuracy bonus | ✅ Implemented |
 
 Steps 9-13 were scoped in a planning session on 2026-10-28; full
 implementation detail for each lives inline in its own entry below in
@@ -1284,7 +1286,8 @@ displayed to do it"):** `snowball-thrower.spawn()` now emits
 that while its panel is active and emits `restart-game`, which
 `wave-director` picks up to reset score to 0 and restart at wave 1 — not an
 aimed hit on the panel itself, since requiring precise aim right after
-reading an end screen isn't the point.
+reading an end screen isn't the point. A later input-safety improvement
+requires five throws and keeps the remaining count visible before restarting.
 
 **3. Welcome/intro screen.** New `welcome-screen` component, same
 one-shot-world-space-panel pattern (factored into shared `vr-panel.js`, see
@@ -1295,10 +1298,10 @@ vr-mode is usually still false the instant this first shows), plus a small
 canvas-drawn controller icon (`core/controller-icon.js`: tracking ring +
 handle silhouette + a highlighted/glowing trigger area + a curved "squeeze"
 arrow) since the user specifically asked for a mini visual of the control,
-not just text. Dismissed by the player's own first throw (same
-`snowball-thrown` event end-screen uses) — a natural "do the thing to
-continue" affordance — or after `CONFIG.welcomeAutoHideSeconds` (14s) if
-they never throw, so it never lingers forever.
+not just text. The original implementation dismissed on one throw or a
+14-second timeout. A later input-safety improvement keeps the panel up
+until three throws start wave 1, showing the throw count so one accidental
+shot cannot dismiss it.
 
 **Shared panel builder: `core/vr-panel.js`.** Once a second screen needed
 the exact same framed-card construction (teal border + dark backdrop +
@@ -1362,7 +1365,7 @@ in this project.
 
 **New config:** `creditsAfterWave`, `creditsPanelDistance/Width/Height`,
 `creditsParticleCount`, `welcomePanelDistance/Width/Height`,
-`welcomeAutoHideSeconds` — all in `js/config.js`. **New i18n keys:**
+`welcomeShotsToStart`, `restartShotsToStart` — all in `js/config.js`. **New i18n keys:**
 `welcomeTitle`, `gameComplete`, `finalScore`, `createdBy`, `restartHint`
 (es/en) plus the shared `MODEL_CREDIT` constant, all in `js/i18n.js`. **New
 files:** `js/core/canvas-text.js`, `js/core/vr-panel.js`,
@@ -1373,7 +1376,7 @@ screens' dismiss/restart triggers; harmless no-op for anything else that
 might listen later). **New entities on `<a-scene>`:** `end-screen
 welcome-screen` (alongside the existing `snowball-thrower wave-director`).
 
-**Tested this session** (Browser pane, same single-frame-render-on-demand
+**Originally tested this session** (Browser pane, same single-frame-render-on-demand
 constraint as every prior step — each screenshot forces one render):
 fresh-tab console clean across every reload; `welcome-screen` shows
 "¡Bienvenido!" + the (correctly accented) instruction text + the controller
@@ -1448,9 +1451,8 @@ requested polish item:
 
 **Step 7 follow-up round 2 (same session, after the user asked how
 scoring works and what could improve):** three scoring changes, two
-implemented now, one deliberately deferred to step 13 (see that step's
-entry) per the user's own call ("me parece, pero quizás lo ponemos en
-progress como otra etapa").
+implemented in that round; accuracy was deferred to step 13 and has since
+been implemented (see that step's entry).
 
 1. **Best score, persisted.** New `js/core/best-score.js`
    (`getBestScore`/`updateBestScore`, `localStorage`, try/catch-guarded
@@ -1566,13 +1568,17 @@ Up/Down) still move forward/back as before; zero new console errors.
 </details>
 
 <details>
-<summary><strong>Step 10 — per-difficulty snowman look + bigger type-7 (⬜ Not started)</strong></summary>
+<summary><strong>Step 10 — per-difficulty snowman look + bigger type-7 (✅ Implemented; rendered verification pending)</strong></summary>
 
-**Scoped 2026-10-28, not yet implemented.** All snowmen currently share one
-base-color texture regardless of their `hitsToExplode` "type" (1/3/5/7,
-from step 4/5bis) — no visual cue for toughness before you start hitting
-one. Ask: distinct look per type, plus make the type-7 ("hardest") snowman
-1.5x bigger, same shape.
+**Implemented 2026-10-28; follow-up requested after a rendered screenshot.**
+Snowmen signal their `hitsToExplode` type (1/3/5/7) with bright hat and
+accessory recolors, plus a white hit-count number painted directly into the
+front of the hat texture, upright relative to the brim and twice its
+previous size, vertically flipped in the texture to compensate for the
+crown UV orientation so it reads in the proper direction on the model.
+Type 7 is 2x bigger while keeping the same model shape.
+Additionally, type-5/7 snowmen have a 60% chance to spawn in the outer fog
+transition band for a distant, partially obscured silhouette.
 
 **Files:** `assets/models/copito/textures/` (new images); `index.html`'s
 `<a-assets>` block (new preloaded `<img>` entries); `js/config.js` (new
@@ -1594,25 +1600,23 @@ also why per-instance hit-flash/cracks already work correctly across
 multiple simultaneous snowmen today. The only new cost is preloading a
 handful of extra small images in `<a-assets>`, same as any other asset.
 
-**Preserving the current look, non-negotiable:** the original
-`mueco_de_nieve_baseColor.jpeg` is never edited or replaced — type-1
-(basic) snowmen keep using it completely untouched. New variant images are
-added *alongside* it; nothing about the current working look changes
-unless a snowman's type calls for an override.
+**Preserving the source texture:** the original
+`mueco_de_nieve_baseColor.jpeg` is never edited or replaced. Each type uses
+a generated variant alongside it; type 1 keeps the original scarf and body
+but gets a bright hat and its painted `1`, while the tougher types have
+their own accessory recolors and painted hit-count number.
 
-**Recoloring approach:** not a uniform full-texture tint — recolor
+**Implemented recoloring:** not a uniform full-texture tint — recolor
 specific accessory regions (hat band, scarf) instead, far more legible as
 a difficulty signal than washing the whole snowman one color, while
 keeping ~90% of the texture (the snow body itself) pixel-identical to the
 original. Suggested scheme (tune on the actual render, not just the flat
 texture):
-- **Type 1 (basic):** untouched original.
-- **Type 3:** scarf recolored (e.g. teal/blue).
-- **Type 5:** scarf + hat band both recolored, one more signal than type 3
-  — mirrors how the existing crack system already stacks more visual
-  signal onto tougher types rather than just swapping one thing.
-- **Type 7 (biggest):** hat band + scarf recolored to the "hottest" tones
-  (e.g. red/dark), stacked with the already-planned 1.5x size — reads as
+- **Type 1 (basic):** original scarf/body with a bright pink hat.
+- **Type 3:** scarf and black hat recolored teal.
+- **Type 5:** scarf, hat band, and hat recolored blue/orange.
+- **Type 7 (biggest):** scarf red, band blue, and hat gold, stacked with
+  the 2x size — reads as
   "boss" via size *and* color.
 
 Mechanically: sample the existing texture's actual hat/scarf pixel colors
@@ -1630,13 +1634,14 @@ always verify on the rendered model in-browser, not just the 2D texture
 file, before calling a variant done.
 
 Preload the new per-type images in `<a-assets>`; swap only
-`material.map`'s `.image` (keeping the already-correctly-configured
+`material.map`'s image/source data (keeping the already-correctly-configured
 `THREE.Texture` object — colorSpace/wrap/flip — rather than building a new
-one) inside `copito.collectMaterials`, keyed off `this.hitsToExplode`.
+one) inside `copito.collectMaterials`, keyed off `this.hitsToExplode`, and
+mark the material for refresh so WebGL displays the new source.
 
 **Bigger type-7, exact scaling (not approximate):** multiply both the
 scale attribute (`CONFIG.copitoScale`) and every component of
-`CONFIG.copitoOffset` by the same `CONFIG.bigSnowmanScaleMultiplier` (1.5)
+`CONFIG.copitoOffset` by the same `CONFIG.bigSnowmanScaleMultiplier` (2)
 for a type-7 instance only. This is exact because this file documents the
 original offset (see Step 1's deviation notes) as solved as
 `offset = -scale * localCenter` (`offset.y = -scale * localMin.y`) —
@@ -1652,11 +1657,30 @@ height/radius scales per-target), sparkle vertical spread, and the
 explosion chunk height band. Not in scope: an actual different mesh for
 type 7 — "same shape... but bigger" stays a scale + texture change only.
 
-**Verification:** force each `hitsToExplode` value via the same direct
-`wave-director.startWave(n)` / `copito` activation technique already used
-in step 4/5bis testing, screenshot each type side-by-side to confirm the
-recolor reads clearly and the type-7 instance is ~1.5x bigger with feet
-grounded and hit detection working head-to-foot.
+Types 1/3/5/7 use preloaded PNGs; the original JPEG remains unchanged.
+Dark hat pixels are raised to bright pink, teal, orange, and gold
+respectively; the scarf/band colors provide additional type-specific cues.
+The white type number is painted directly into the front-facing crown UV
+area (not the brim), rotated to read upright relative to the brim and twice
+its previous size, vertically flipped to compensate for the model's UV
+orientation; it is not displayed on a separate floating badge. Type 7's scale
+multiplier also sizes its model offset, hit pivot, shadow, sparkle spread,
+cracks, hit capsule, and explosion chunk height band. In the fog spawn band,
+type-5/7 snowmen are sampled from 6.1m to the existing 7m maximum (inside
+the scene's 4.5m-to-7.9m fog transition).
+
+**Follow-up visual feedback:** the initial in-browser screenshot showed the
+original black hat despite the generated texture variants. Texture
+replacement now updates both the Three.js texture image/source and marks
+the material for refresh. The hit-count number is now painted directly onto
+the hat texture so it moves with the snowman. Each kill shows its awarded
+points above the snowman. The welcome panel requires 3 throws to start and
+the credits panel requires 5 to restart, with progress shown in both
+panels. Texture variants and the selected hat UV patch were inspected at
+full resolution, and the source JPEG remains unchanged. Rendered
+verification of the UV placement, type-7 grounding, and fog silhouette is
+still pending; none of the gameplay since step 3 has yet been tried on a
+real Quest 2.
 
 </details>
 
@@ -1860,45 +1884,33 @@ scene unreadable at peak opacity.
 </details>
 
 <details>
-<summary><strong>Step 13 — scoring: accuracy bonus (⬜ Not started)</strong></summary>
+<summary><strong>Step 13 — progressive scoring bonuses (✅ Implemented)</strong></summary>
 
-**Scoped 2026-10-28, not yet implemented** (requested alongside the step 7
-scoring improvements below, but deliberately deferred to its own step
-rather than folded in -- the user's call: "me parece [buena idea], pero
-quizás lo ponemos en progress como otra etapa"). Idea: reward *accuracy*,
-not just survival/speed -- right now a miss costs nothing (see step 4's
-snowball packing/landing system, misses just pile up on the ground), so a
-player spamming throws scores identically to one aiming carefully, besides
-the wave-clear time bonus (step 7) which only rewards overall wave speed,
-not per-target precision.
+The user clarified that bonuses should start at wave 5 and grow progressively:
+time and wave-clear bonuses begin at wave 5; ball-use/accuracy bonuses begin
+at wave 7. Implemented in `js/components/wave-director.js`:
 
-Two options floated, not yet chosen between:
+- Base snowman points remain 10/30/50/70 (10 per hit/life). The floating
+  popup now says how many hits earned those points.
+- Wave 1-4 have no wave-clear or time bonus. Starting at wave 5, the clear
+  bonus starts at 50 and grows by 10 each wave. The soft timer remains
+  forgiving and scales with the number of snowmen; its maximum reward grows
+  by 10% per wave after wave 5.
+- Starting at wave 7, accuracy earns a share of the wave's base snowman
+  score. It starts at 10%, increases by 5 percentage points per wave, and
+  caps at 50%; the award is scaled by the wave's hit/throw ratio.
+- A wave-clear announcement in the HUD shows each bonus and the accuracy
+  rate, so the total score has a visible explanation. The HUD uses its
+  original compact text size when there is no bonus notice; it expands
+  vertically while the bonus breakdown is displayed, then returns to its
+  compact size after five seconds at most (or when the next wave begins).
+  When the canvas height changes, its Three.js texture is recreated so the
+  expanded bonus text is uploaded at the new dimensions.
 
-1. **Per-snowman "clean kill" bonus**: extra points if a snowman was
-   destroyed without any snowball fired at it missing (tracked per
-   registered snowman -- `copitoRegistry`, see `js/registry/
-   copito-registry.js`, already has one entry per active snowman;
-   `snowball-thrower.findHitSnowman` already knows which snowman a given
-   flying snowball was aimed near when it misses, though "aimed near"
-   vs "truly aimed at that one" would need a definition for multi-snowman
-   waves where more than one target is in a throw's rough path).
-2. **Wave-level "no misses" streak**: track total throws vs total hits for
-   the whole wave (simpler to implement -- `snowball-thrower` already
-   knows every throw via the `snowball-thrown` event added in step 7, and
-   every hit via `snowball-hit`), bonus if the ratio is 100% (or above some
-   threshold) when the wave clears.
-
-Option 2 is simpler and doesn't need per-snowman attribution, so it's the
-likely starting point unless the user asks for the more granular per-kill
-version. Either way: new `CONFIG` constant(s) for the bonus amount, wired
-into `wave-director`'s existing `onSnowmanDestroyed`/`scheduleNextWave`
-scoring path (same place the step 7 per-kill and time bonuses live), and a
-new counter somewhere tracking throws-vs-hits per wave (reset in
-`startWave`). Should show up on the end screen's score breakdown
-eventually too, once there is one (today's end screen just shows one
-final total, see step 7 -- if accuracy bonus lands, consider breaking the
-total into separate score-breakdown lines there, since multiple bonus
-sources are getting hard to infer from one number).
+The per-wave throw and hit counters reset at each wave; a dedicated
+`snowball-hit-registered` event carries the throw ID and is emitted before
+snowman hit handling, so the final impact is included while throws from an
+intermission or a previous wave cannot inflate the next wave's accuracy.
 
 </details>
 
