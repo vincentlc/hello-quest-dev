@@ -1572,9 +1572,9 @@ Up/Down) still move forward/back as before; zero new console errors.
 
 **Implemented 2026-10-28; follow-up requested after a rendered screenshot.**
 Snowmen signal their `hitsToExplode` type (1/3/5/7) with bright hat and
-accessory recolors, plus a dark-blue hit-count number painted directly into
-the hat texture so it follows the model's movement. Type 7 is 2x bigger
-while keeping the same model shape.
+accessory recolors, plus a white hit-count number painted directly into the
+front of the hat texture so it follows the model's movement. Type 7 is 2x
+bigger while keeping the same model shape.
 Additionally, type-5/7 snowmen have a 60% chance to spawn in the outer fog
 transition band for a distant, partially obscured silhouette.
 
@@ -1658,8 +1658,8 @@ type 7 — "same shape... but bigger" stays a scale + texture change only.
 Types 1/3/5/7 use preloaded PNGs; the original JPEG remains unchanged.
 Dark hat pixels are raised to bright pink, teal, orange, and gold
 respectively; the scarf/band colors provide additional type-specific cues.
-The dark-blue type number is painted directly into the front-facing hat UV
-area, not displayed on a separate floating badge. Type 7's scale
+The white type number is painted directly into the front-facing crown UV
+area (not the brim), not displayed on a separate floating badge. Type 7's scale
 multiplier also sizes its model offset, hit pivot, shadow, sparkle spread,
 cracks, hit capsule, and explosion chunk height band. In the fog spawn band,
 type-5/7 snowmen are sampled from 6.1m to the existing 7m maximum (inside
