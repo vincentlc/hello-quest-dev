@@ -65,15 +65,39 @@ export default {
     if (!mesh) return;
     this.materials = [];
     var seen = {};
+    var textureId = {
+      1: 'copitoTextureT1',
+      3: 'copitoTextureT3',
+      5: 'copitoTextureT5',
+      7: 'copitoTextureT7'
+    }[this.hitsToExplode];
+    var variantTexture = textureId && document.getElementById(textureId);
+    if (textureId && !variantTexture) {
+      throw new Error('Missing snowman texture asset: ' + textureId);
+    }
+    if (variantTexture && (!variantTexture.complete || !variantTexture.naturalWidth)) {
+      throw new Error('Snowman texture asset is not loaded: ' + textureId);
+    }
+    var replacedTexture = false;
     mesh.traverse((node) => {
       if (!node.material) return;
       var mats = Array.isArray(node.material) ? node.material : [node.material];
       mats.forEach((mat) => {
         if (seen[mat.uuid] || !mat.color) return;
         seen[mat.uuid] = true;
+        if (variantTexture && mat.map) {
+          mat.map.image = variantTexture;
+          if (mat.map.source) mat.map.source.data = variantTexture;
+          mat.map.needsUpdate = true;
+          mat.needsUpdate = true;
+          replacedTexture = true;
+        }
         this.materials.push({ material: mat, originalColor: mat.color.clone() });
       });
     });
+    if (variantTexture && !replacedTexture) {
+      throw new Error('No textured snowman material found for type ' + this.hitsToExplode);
+    }
   },
 
   flashMaterials: function (time) {

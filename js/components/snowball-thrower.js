@@ -44,6 +44,7 @@ AFRAME.registerComponent('snowball-thrower', {
     var THREE = AFRAME.THREE;
     this.pool = [];
     this.nextIndex = 0;
+    this.nextThrowId = 0;
     // FIFO of currently-landed slots, oldest first -- bounded by
     // CONFIG.maxLandedSnowballs (see land()/evictOldestLanded()).
     this.landed = [];
@@ -95,6 +96,7 @@ AFRAME.registerComponent('snowball-thrower', {
 
     sb.state = 'flying';
     sb.spawnTime = this.lastTickTime;
+    sb.throwId = ++this.nextThrowId;
     sb.el.object3D.position.copy(origin);
     sb.el.object3D.scale.set(1, 1, 1);
     sb.el.object3D.visible = true;
@@ -106,7 +108,7 @@ AFRAME.registerComponent('snowball-thrower', {
     // to restart the run (any throw, while its post-credits freeze is
     // active -- not an aimed hit on the panel itself, since requiring
     // precise aim right after reading an end screen isn't the point).
-    this.el.emit('snowball-thrown');
+    this.el.emit('snowball-thrown', { throwId: sb.throwId });
   },
 
   deactivate: function (sb) {
@@ -245,6 +247,7 @@ AFRAME.registerComponent('snowball-thrower', {
       var pos = sb.el.object3D.position;
       var hitSnowman = this.findHitSnowman(pos);
       if (hitSnowman) {
+        this.el.emit('snowball-hit-registered', { throwId: sb.throwId });
         hitSnowman.el.emit('snowball-hit', { point: { x: pos.x, y: pos.y, z: pos.z } });
         this.deactivate(sb);
         continue;
@@ -279,8 +282,8 @@ AFRAME.registerComponent('snowball-thrower', {
       var dz = pos.z - this.scratchCopitoPos.z;
       var horizontalDist = Math.sqrt(dx * dx + dz * dz);
       var withinHeight = pos.y >= this.scratchCopitoPos.y &&
-        pos.y <= this.scratchCopitoPos.y + CONFIG.snowmanHeight + CONFIG.hitHeightMargin;
-      if (horizontalDist <= CONFIG.snowballHitRadius && withinHeight) return snowman;
+        pos.y <= this.scratchCopitoPos.y + (CONFIG.snowmanHeight + CONFIG.hitHeightMargin) * snowman.sizeScale;
+      if (horizontalDist <= CONFIG.snowballHitRadius * snowman.sizeScale && withinHeight) return snowman;
     }
     return null;
   }

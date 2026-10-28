@@ -9,11 +9,9 @@ import { getControllerIconTexture } from '../core/controller-icon.js';
 // pull the trigger in VR, click on desktop) with a small controller
 // icon highlighting the trigger, since a brand-new player dropped into
 // a snowy field with no UI otherwise has no way to know that. Dismissed
-// by the player's own first throw (snowball-thrower emits
-// 'snowball-thrown' on every spawn(), see that file) -- a natural "do
-// the thing to continue" affordance -- or after
-// CONFIG.welcomeAutoHideSeconds if they never throw, so it never
-// lingers forever.
+// after three throws (snowball-thrower emits 'snowball-thrown' on every
+// spawn(), see that file). The count remains visible until then, so an
+// accidental first shot cannot dismiss the instructions.
 //
 // Text swaps live between the VR and desktop phrasing if the player
 // enters/exits VR while the panel is still up: entering VR needs its
@@ -24,6 +22,7 @@ AFRAME.registerComponent('welcome-screen', {
   init: function () {
     this.active = false;
     this.dismissed = false;
+    this.shotsThrown = 0;
 
     var iconSize = 0.4;
     var iconGap = 0.12;
@@ -31,7 +30,7 @@ AFRAME.registerComponent('welcome-screen', {
       width: CONFIG.welcomePanelWidth,
       borderColor: CONFIG.colors.crownCyan,
       subtitleMaxLines: 3, // the "Snoworld Copito" tagline, may wrap a couple times
-      bodyMaxLines: 2, // the instruction sentence may wrap once (VR phrasing is long)
+      bodyMaxLines: 2, // instruction and shot count
       extraBottom: iconGap + iconSize + 0.08 // reserve room below the body for the controller icon
     });
     this.panel = this.built.panel;
@@ -47,7 +46,7 @@ AFRAME.registerComponent('welcome-screen', {
 
     this.el.addEventListener('enter-vr', () => this.refreshText());
     this.el.addEventListener('exit-vr', () => this.refreshText());
-    this.el.addEventListener('snowball-thrown', () => this.dismiss());
+    this.el.addEventListener('snowball-thrown', () => this.onSnowballThrown());
 
     var attach = () => setTimeout(() => this.show(), 300);
     if (this.el.hasLoaded) attach();
@@ -61,14 +60,27 @@ AFRAME.registerComponent('welcome-screen', {
     this.refreshText();
     this.panel.setAttribute('visible', true);
     this.active = true;
-    this.shownAt = performance.now();
   },
 
   refreshText: function () {
     var lang = I18N[LANG];
     this.built.setTitle(lang.welcomeTitle);
     this.built.setSubtitle(lang.welcomeSubtitle);
-    this.built.setBody(this.el.is('vr-mode') ? lang.instructionVR : lang.instructionDesktop);
+    this.built.setBody(
+      (this.el.is('vr-mode') ? lang.instructionVR : lang.instructionDesktop) + '\n' +
+      lang.shotsProgress + ': ' + this.shotsThrown + '/' + CONFIG.welcomeShotsToStart
+    );
+  },
+
+  onSnowballThrown: function () {
+    if (!this.active || this.dismissed) return;
+    this.shotsThrown++;
+    if (this.shotsThrown >= CONFIG.welcomeShotsToStart) {
+      this.dismiss();
+      this.el.emit('start-game');
+      return;
+    }
+    this.refreshText();
   },
 
   dismiss: function () {
@@ -81,6 +93,5 @@ AFRAME.registerComponent('welcome-screen', {
   tick: function (time) {
     if (!this.active) return;
     this.icon.material.opacity = 0.75 + 0.25 * Math.sin(time / 300);
-    if ((time - this.shownAt) / 1000 > CONFIG.welcomeAutoHideSeconds) this.dismiss();
   }
 });

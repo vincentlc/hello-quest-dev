@@ -5,12 +5,19 @@
 // ---------------------------------------------------------------------
 export var I18N = {
   es: {
-    instructionVR: '¡Apunta y aprieta el gatillo para lanzar bolas de nieve!',
-    instructionDesktop: 'Haz clic para lanzar',
+    instructionVR: 'Aprieta 3 veces para comenzar',
+    instructionDesktop: 'Haz clic 3 veces para comenzar',
+    shotsProgress: 'Lanzamientos',
+    restartProgress: 'Lanzamientos para reiniciar',
     hits: 'Golpes',
+    hitLabelSingular: 'golpe',
+    hitLabel: 'golpes',
     destroyed: 'Muñecos destruidos',
     wave: 'Oleada',
     score: 'Puntos',
+    waveBonus: 'Oleada',
+    timeBonus: 'Tiempo',
+    accuracyBonus: 'Precisión',
     // "Te damos la bienvenida" instead of "¡Bienvenido!" -- gender-neutral
     // phrasing (no -o/-a ending to agree with the player's gender), per
     // the user's request. Subtitle no longer repeats "bienvenido" for the
@@ -23,15 +30,22 @@ export var I18N = {
     bestScore: 'Mejor puntaje',
     newRecord: '¡Nuevo récord!',
     createdBy: 'Creado por Vincentlc',
-    restartHint: 'Lanza una bola de nieve para volver a jugar'
+    restartHint: 'Lanza 5 bolas de nieve para volver a jugar'
   },
   en: {
-    instructionVR: 'Aim and pull the trigger to throw snowballs!',
-    instructionDesktop: 'Click to throw',
+    instructionVR: 'Pull trigger 3 times to start',
+    instructionDesktop: 'Click 3 times to start',
+    shotsProgress: 'Throws',
+    restartProgress: 'Throws to restart',
     hits: 'Hits',
+    hitLabelSingular: 'hit',
+    hitLabel: 'hits',
     destroyed: 'Snowmen destroyed',
     wave: 'Wave',
     score: 'Score',
+    waveBonus: 'Wave bonus',
+    timeBonus: 'Time bonus',
+    accuracyBonus: 'Accuracy',
     welcomeTitle: 'Welcome!',
     welcomeSubtitle: 'Snoworld Copito: the game that takes on the snowmen',
     gameComplete: 'Game complete!',
@@ -39,7 +53,7 @@ export var I18N = {
     bestScore: 'Best score',
     newRecord: 'New record!',
     createdBy: 'Created by Vincentlc',
-    restartHint: 'Throw a snowball to play again'
+    restartHint: 'Throw 5 snowballs to play again'
   }
 };
 export var LANG = 'es';
