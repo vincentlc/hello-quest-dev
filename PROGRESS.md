@@ -1,24 +1,55 @@
 # Progress: snowman_demo
 
-Updated 2026-10-27. Read this file first in any new session working on this
+Updated 2026-10-28. Read this file first in any new session working on this
 project — it has everything learned so far that isn't obvious from the code,
 so you don't need to re-derive it (and re-spend tokens doing so).
 
-Original spec: `~/Documents/Claude_folder/Meta_quest_coaniquem/02_plans/snowman_demo_prompt.md`
-(the full work order — lives outside this repo, in the user's planning
-folder, not duplicated here). This file tracks what changed from it, what's
-done, and what's next.
+Original spec: an external work-order document from the user's own planning
+folder, outside this repo (not duplicated here, and no longer kept at the
+path earlier notes in this file used to reference). This file tracks what
+changed from it, what's done, and what's next.
 
 **This repo (`hello-quest-dev`) is now the snowman demo itself**, not just a
 build output. It started as a separate, simpler A-Frame "cube" test page
 (laser pointers, click-to-cycle-color cube); that original version is
 preserved as git tag `cube-demo-v1` and is **not** being developed further —
-everything going forward is the snowman demo. The project was built in
-`~/Documents/Claude_folder/Meta_quest_coaniquem/04_prototypes/snowman_demo/`
-first (steps 1 and the ground/sky iteration happened there) and moved into
-this repo's root afterward so it'd be under git. That source folder no
-longer exists (emptied by the move); if any note below still mentions it by
-path, read it as historical, not current.
+everything going forward is the snowman demo. The project was built first in
+an external prototyping folder outside this repo (steps 1 and the
+ground/sky iteration happened there) and moved into this repo's root
+afterward so it'd be under git. That source folder no longer exists (emptied
+by the move); if any note below still mentions it, read it as historical,
+not current.
+
+## Status at a glance
+
+**Current step: Step 6 (sound + haptics) — not started.** Steps 1-5bis are
+done (desktop/Browser-pane verified; see the caveat below). Steps 9-11 are
+newly planned, not started, and not blocking 6-8 — pick them up whenever,
+each as its own branch + PR per `CLAUDE.md`.
+
+**Outstanding across every step since step 3:** none of this has been tried
+on a real Quest 2 headset yet — only desktop + the in-app Browser pane.
+Keep that in mind before calling anything "done" in the VR-comfort sense.
+
+| Step | What | Status |
+| --- | --- | --- |
+| 1 | Folder, vendored A-Frame, sky, ground, Copito static | ✅ Done |
+| 2 | Idle animation + sparkles | ✅ Done |
+| 3 | Throwing (desktop + controllers), pool, trajectory preview | ✅ Done |
+| 4 | 3-hit reactions + snowball packing/stacking | ✅ Done |
+| 5 | Explosion + respawn | ✅ Done |
+| 5 bis | Wave/level director (multi-snowman waves, HUD) | ✅ Done |
+| 6 | Sound + haptics | ⬜ Not started |
+| 7 | HUD + i18n + accent check + in-VR credit line | ⬜ Not started |
+| 8 | Performance pass + README/ASSETS.md + final docs grep | ⬜ Not started |
+| 9 | Desktop turn controls (rotate, not strafe, on Left/Right) | ⬜ Not started |
+| 10 | Per-difficulty snowman textures + bigger type-7 | ⬜ Not started |
+| 11 | Landscape progression after wave 5 / wave 10 | ⬜ Not started |
+
+Steps 9-11 were scoped in a planning session on 2026-10-28; full
+implementation detail for each lives inline in its own entry below in
+"Step-by-step status" — written so a cold session can execute directly from
+this file.
 
 ## Lessons learned (read before repeating a mistake)
 
@@ -86,10 +117,9 @@ the step-by-step status.
 
 - **This project lives in the `hello-quest-dev` git repo, at its root**
   (`index.html`, `vendor/`, `assets/`, this file, `ASSETS.md`). If Claude
-  Code is started elsewhere, `cd` here first. The original planning folder
-  (`~/Documents/Claude_folder/Meta_quest_coaniquem/`) still holds the work
-  order and the bigger-picture docs (`01_context/`, `02_plans/`, etc.) but no
-  longer has a copy of this project's files.
+  Code is started elsewhere, `cd` here first. The original external
+  planning folder (outside this repo) still holds the work order and the
+  bigger-picture docs, but no longer has a copy of this project's files.
 - **The repo has a remote**: `origin` →
   `https://github.com/vincentlc/hello-quest-dev.git`. Nothing has been
   pushed as part of this move — only committed locally. Don't push without
@@ -225,9 +255,18 @@ the step-by-step status.
 
 ## Step-by-step status
 
+<details>
+<summary><strong>Step 1 — folder, vendored A-Frame, sky, ground, Copito static (✅ Done)</strong></summary>
+
 **Step 1 — folder, vendored A-Frame, sky, ground, Copito static: DONE**
 (with the deviations above layered on top, all verified working, zero
 console errors as of this writing).
+
+
+</details>
+
+<details>
+<summary><strong>Step 2 — idle animation + sparkles (✅ Done)</strong></summary>
 
 **Step 2 — idle animation + sparkles: DONE.**
 - Bob (2cm, 2.5s sine) + slight sway (~2deg, 3.2s sine, deliberately
@@ -247,6 +286,12 @@ console errors as of this writing).
   randomized once at init and advanced each tick; verified visually in the
   browser (sparkle positions clearly shift frame to frame, zero console
   errors).
+
+
+</details>
+
+<details>
+<summary><strong>Step 3 — throwing (desktop + controllers), pool, trajectory preview, incl. the aim-direction follow-up fix (✅ Done)</strong></summary>
 
 **Step 3 — throwing (desktop + controllers), pool, trajectory preview:
 DONE.**
@@ -423,6 +468,12 @@ note below for how the two steps meet.
   `CONFIG.colors.snowball` when implementing.
 
 </details>
+
+
+</details>
+
+<details>
+<summary><strong>Step 4 — 3-hit reactions + snowball packing/stacking, incl. all follow-up rounds and the crack redesign (✅ Done)</strong></summary>
 
 **Step 4 — 3-hit reactions + snowball packing/stacking: DONE.**
 
@@ -791,6 +842,12 @@ than the round-2 version, which read as flatter. Root cause and fix:
 
 </details>
 
+
+</details>
+
+<details>
+<summary><strong>Step 5 — explosion + respawn (✅ Done)</strong></summary>
+
 **Step 5 — explosion + respawn: DONE.** Branched off
 `step-4-hit-reactions-and-packing` (not `main`) since the explosion logic
 needed step 4's hit-state machine to hook into; rebased onto `main` once
@@ -902,6 +959,12 @@ step 4 merged (`#3`), so the branch history is linear.
   surrounding scene (sky/ground/fog) unaffected. **Not yet tested on an
   actual Quest 2 headset** — same outstanding item as every step since
   step 3, plus the comfort-rule caveat above.
+
+
+</details>
+
+<details>
+<summary><strong>Step 5 bis — wave/level director, incl. both follow-up rounds (✅ Done)</strong></summary>
 
 **Step 5 bis — wave/level director (new, not in the original spec): DONE.**
 Branched off `main` as `step-5bis-wave-director`. Built per the design below
@@ -1122,6 +1185,12 @@ more requests:
   needs real headset judgment, not just the "don't lock it dead-center"
   guideline followed here.
 
+
+</details>
+
+<details>
+<summary><strong>Step 6 — sound + haptics (⬜ Not started)</strong></summary>
+
 **Step 6 — sound + haptics: not started.** Same access problem as the sky
 image is likely for Kenney/Freesound — the user will probably need to
 download the Kenney Impact Sounds zip and the Freesound wind clip themselves
@@ -1135,6 +1204,12 @@ those; ambience: Freesound "Soft Wind Ambience.wav" by cribbler (CC0 1.0, id
 380379), loop-crossfaded locally with ffmpeg since it isn't natively
 loopable. `CONFIG.volume` and `CONFIG.haptics` are already defined.
 
+
+</details>
+
+<details>
+<summary><strong>Step 7 — HUD + i18n + accent check (⬜ Not started)</strong></summary>
+
 **Step 7 — HUD + i18n + accent check: not started.** Also: **add the in-VR
 CC-BY credit line here** (owed from step 1/model swap, see deviation #1
 above). `I18N` object already has the core strings; test á/é/ñ/¡ rendering
@@ -1142,15 +1217,226 @@ in A-Frame's default MSDF font early in this step — fall back to a
 canvas-texture text plane if glyphs are missing (spec's own documented
 fallback).
 
+
+</details>
+
+<details>
+<summary><strong>Step 8 — performance pass + README/ASSETS.md (⬜ Not started)</strong></summary>
+
 **Step 8 — performance pass + README + ASSETS.md: not started.** The
 original work order's "add a row to the planning folder's README" item is
 superseded now that the project moved into its own repo — instead, the
-planning folder's `README.md`
-(`~/Documents/Claude_folder/Meta_quest_coaniquem/README.md`) should note
-that this demo now lives in the separate `hello-quest-dev` git repo, the
-same way it already describes `snow-canyon` as "a separate git repo...kept
-outside this folder". Still outstanding, don't forget it. Final no-em-dash
-grep check across all authored files before calling this done.
+external planning folder's own `README.md` should note that this demo now
+lives in the separate `hello-quest-dev` git repo, the same way it already
+describes `snow-canyon` as "a separate git repo...kept outside this
+folder". Still outstanding, don't forget it. Final no-em-dash grep check
+across all authored files before calling this done.
+
+
+</details>
+
+<details>
+<summary><strong>Step 9 — desktop turn controls (⬜ Not started)</strong></summary>
+
+**Scoped 2026-10-28, not yet implemented.** On desktop, A-Frame's built-in
+`wasd-controls` makes Left/Right (and A/D) strafe the player sideways —
+that reads as sliding, not turning, unlike VR where looking left/right is
+a head/body rotation. Ask: make desktop Left/Right rotate the view
+instead. Confirmed with the user: **smooth continuous rotation** while a
+key is held (not snap-turn).
+
+**File:** `index.html` — camera entity (`<a-entity camera ...>`, currently
+`look-controls wasd-controls`), `CONFIG` block, one new component.
+
+1. `CONFIG.desktopTurnSpeedDegPerSec = 90` (tunable later).
+2. Add `wasd-controls="adEnabled: false"` to the camera entity. Confirmed
+   in `vendor/aframe.min.js`: `wasd-controls`'s `adEnabled` schema flag
+   (default `true`) gates the `KeyA`/`ArrowLeft` and `KeyD`/`ArrowRight`
+   branches of its velocity update — setting it `false` removes sideways
+   strafing from both WASD and the arrow keys entirely, while leaving
+   `KeyW`/`ArrowUp` and `KeyS`/`ArrowDown` (forward/back) untouched.
+3. New component, e.g. `desktop-turn`, added to the same camera entity.
+   Tracks `ArrowLeft`/`ArrowRight`/`KeyA`/`KeyD` keydown/keyup in its own
+   `this.keys` map (same lightweight pattern `wasd-controls` itself uses).
+   In `tick(time, delta)`, while a turn key is held, rotate the view by
+   mutating **`this.el.components['look-controls'].yawObject.rotation.y`**
+   by `±(desktopTurnSpeedDegPerSec * delta/1000 * DEG2RAD)`.
+   - Important: do **not** write `this.el.object3D.rotation.y` directly.
+     Confirmed by reading `look-controls`' vendored source
+     (`updateOrientation`): its own `tick()` recomputes
+     `el.object3D.rotation.y` from its internal `yawObject.rotation.y`
+     every frame, so an external write to `object3D.rotation.y` would be
+     silently overwritten the very next frame. Mutating `yawObject` is
+     exactly what `look-controls`' own mouse-drag handler (`onMouseMove`)
+     already does, so keyboard-turn and mouse-look stay fully compatible.
+   - Direction/sign isn't worth guessing on paper — verify in-browser that
+     "Left" visually turns the view left, flip the sign if it's backwards.
+
+**Verification:** load the page, hold Left — view rotates left
+continuously, not translating; hold Right — rotates right; W/S (and
+Up/Down) still move forward/back as before; zero new console errors.
+
+</details>
+
+<details>
+<summary><strong>Step 10 — per-difficulty snowman look + bigger type-7 (⬜ Not started)</strong></summary>
+
+**Scoped 2026-10-28, not yet implemented.** All snowmen currently share one
+base-color texture regardless of their `hitsToExplode` "type" (1/3/5/7,
+from step 4/5bis) — no visual cue for toughness before you start hitting
+one. Ask: distinct look per type, plus make the type-7 ("hardest") snowman
+1.5x bigger, same shape.
+
+**Files:** `assets/models/copito/textures/` (new images), `index.html`
+(`<a-assets>`, `CONFIG`, `copito`'s `collectMaterials`/model-build code
+around the existing `copitoScale`/`copitoOffset`/`hitPivotHeight`
+application, and `snowball-thrower.findHitSnowman`'s hit-capsule check).
+
+**Performance, addressed up front:** swapping which static image is bound
+as a mesh's base-color texture costs nothing extra at render time — it's
+still one texture, one material, one draw call per snowman, identical to
+today. Confirmed each snowman already loads its own independent glTF via a
+fresh `GLTFLoader.load()` call (vendored `gltf-model` component), so
+materials/textures are never shared across instances already — this is
+also why per-instance hit-flash/cracks already work correctly across
+multiple simultaneous snowmen today. The only new cost is preloading a
+handful of extra small images in `<a-assets>`, same as any other asset.
+
+**Preserving the current look, non-negotiable:** the original
+`mueco_de_nieve_baseColor.jpeg` is never edited or replaced — type-1
+(basic) snowmen keep using it completely untouched. New variant images are
+added *alongside* it; nothing about the current working look changes
+unless a snowman's type calls for an override.
+
+**Recoloring approach:** not a uniform full-texture tint — recolor
+specific accessory regions (hat band, scarf) instead, far more legible as
+a difficulty signal than washing the whole snowman one color, while
+keeping ~90% of the texture (the snow body itself) pixel-identical to the
+original. Suggested scheme (tune on the actual render, not just the flat
+texture):
+- **Type 1 (basic):** untouched original.
+- **Type 3:** scarf recolored (e.g. teal/blue).
+- **Type 5:** scarf + hat band both recolored, one more signal than type 3
+  — mirrors how the existing crack system already stacks more visual
+  signal onto tougher types rather than just swapping one thing.
+- **Type 7 (biggest):** hat band + scarf recolored to the "hottest" tones
+  (e.g. red/dark), stacked with the already-planned 1.5x size — reads as
+  "boss" via size *and* color.
+
+Mechanically: sample the existing texture's actual hat/scarf pixel colors
+(Pillow + numpy, both already available locally — same "sample real
+pixels, never guess a hex" habit already established in this project for
+the sky/ground/fog colors), build a mask for each region (color-distance
+threshold, ideally narrowed to that region's area of the flat texture
+image first so an unrelated same-colored area, e.g. coal-button eyes,
+doesn't get caught by the same color threshold), then recolor only inside
+the mask (hue shift or direct replace, mask edges slightly feathered to
+avoid hard seams), and save as a new per-type `_tN` variant image.
+**Real risk to check for:** a flat-image color mask can land differently
+on the actual 3D model than expected once UV-mapped (seams, distortion) —
+always verify on the rendered model in-browser, not just the 2D texture
+file, before calling a variant done.
+
+Preload the new per-type images in `<a-assets>`; swap only
+`material.map`'s `.image` (keeping the already-correctly-configured
+`THREE.Texture` object — colorSpace/wrap/flip — rather than building a new
+one) inside `copito.collectMaterials`, keyed off `this.hitsToExplode`.
+
+**Bigger type-7, exact scaling (not approximate):** multiply both the
+scale attribute (`CONFIG.copitoScale`) and every component of
+`CONFIG.copitoOffset` by the same `CONFIG.bigSnowmanScaleMultiplier` (1.5)
+for a type-7 instance only. This is exact because this file documents the
+original offset (see Step 1's deviation notes) as solved as
+`offset = -scale * localCenter` (`offset.y = -scale * localMin.y`) —
+linear in `scale`, so scaling both by the same factor keeps the feet
+planted on the ground and the model centered, with no need to redo the
+live `THREE.Box3` measurement. Thread the same per-instance size
+multiplier into everything else that currently assumes one fixed snowman
+size: `hitPivotHeight`, the hit capsule in
+`snowball-thrower.findHitSnowman` (currently one global
+`CONFIG.snowmanHeight + CONFIG.hitHeightMargin` for every snowman — needs
+`copitoRegistry` to expose each instance's size multiplier so the capsule
+height/radius scales per-target), sparkle vertical spread, and the
+explosion chunk height band. Not in scope: an actual different mesh for
+type 7 — "same shape... but bigger" stays a scale + texture change only.
+
+**Verification:** force each `hitsToExplode` value via the same direct
+`wave-director.startWave(n)` / `copito` activation technique already used
+in step 4/5bis testing, screenshot each type side-by-side to confirm the
+recolor reads clearly and the type-7 instance is ~1.5x bigger with feet
+grounded and hit detection working head-to-foot.
+
+</details>
+
+<details>
+<summary><strong>Step 11 — landscape progression after wave 5 / wave 10 (⬜ Not started)</strong></summary>
+
+**Scoped 2026-10-28, not yet implemented.** The scene has exactly one
+sky/ground/fog look for the whole session. Ask: change it after wave/level
+5, and again after wave/level 10, with one of the two new looks themed
+around southern Chile. Confirmed with the user: both new landscapes are
+**brand-new real photos** (sourced by the user, same workflow as the
+original sky.jpg), and the Chile silhouette touch is a **hand-edit in
+GIMP/Inkscape** done by the user, with Claude supplying exact steps once
+the base photo is chosen.
+
+**Files:** `index.html` (`<a-assets>`, the `<a-sky>`/ground `<a-circle>`
+entities, the scene's `fog` attribute, `CONFIG`, a new `landscape-director`
+component near the existing `wave-director`), plus 2 new photo asset pairs
+under `assets/sky/`.
+
+1. User sources 2 new CC0 (or otherwise licensed + credited in
+   `ASSETS.md`, same as the Sketchfab model) snow-landscape photos — same
+   constraint already documented above (Claude's own fetch/browse tools
+   can't reach most image hosts; Poly Haven etc. confirmed blocked) — same
+   manual download-and-save-into-project workflow as the original. User
+   picks which of the two gets the south-of-Chile treatment.
+2. For that chosen photo, the Chile touch is a hand-edit: (a) sample the
+   photo's own horizon-band color with a short Pillow pixel-average
+   script, same technique already used for this project's ground/fog
+   colors; (b) draw/paste a simple mountain/volcano cone silhouette on the
+   horizon (Inkscape for a clean vector cone, or GIMP's own shape/path
+   tools); (c) fill it with a slightly darker version of the sampled
+   horizon color; (d) light Gaussian blur on the cone's edge so it reads
+   as atmospheric distance, not a pasted sticker; (e) flatten and export
+   at the same resolution/aspect as the other sky photos so the
+   equirectangular mapping on `<a-sky>` isn't distorted. Claude provides
+   the exact values once the base photo is in hand.
+3. For both new photos, run the same asset pipeline already established
+   in this project: tonemap to `.jpg` if sourced as HDR/EXR, crop a ground
+   tile, sample fog/horizon color with Pillow — producing
+   `assets/sky/sky2.jpg`+`ground2.jpg` and
+   `assets/sky/sky3.jpg`+`ground3.jpg`.
+4. `CONFIG.landscapes`: array of 3 entries (default + 2 new), each with
+   sky asset id, ground asset id, fog `color`/`near`/`far`, and the sky's
+   own `rotation` (current photo uses `rotation="0 120 0"` specifically to
+   keep its tree line out of the throwing lane — each new photo gets its
+   own hand-picked rotation the same visual way, not assumed to be 120).
+5. `CONFIG.landscapeWaveThresholds = [5, 10]`: once `wave-director`'s
+   0-based `waveIndex` reaches 5 (right after wave 5 clears) landscape
+   index 1 activates; at `waveIndex === 10`, landscape index 2 activates.
+   Flagging this interpretation explicitly since "after level 5" could
+   also mean "during wave 5" — a one-line shift if the user wants it to
+   land right when wave 5 *starts* instead.
+6. New `landscape-director` component on `<a-scene>`: listens for the
+   `wave-state-changed` event `wave-director` already emits on every wave
+   change (no new event needed), compares `detail.waveIndex` against the
+   thresholds, and on a crossing sets the `<a-sky>`'s `src`, the ground
+   `<a-circle>`'s `material.src`, and the scene's `fog` attributes to the
+   new landscape's values. Tracks `this.currentLandscapeIndex` so it swaps
+   exactly once per threshold.
+7. Flag only, not required up front: if a new photo's ambient tone differs
+   a lot from the current one, the hemisphere/directional lights (which
+   affect Copito's lit `standard`-shader material, unlike the unlit `flat`
+   sky/ground) might look mismatched — same "shader/lighting mismatch" bug
+   class already seen twice in this project. Check visually after the
+   swap; only add per-landscape light tuning if it's actually visible.
+
+**Verification:** jump `wave-director` directly to wave index 5 and 10 and
+screenshot to confirm the sky/ground/fog swap lands at the right point
+with no visible seam/fog mismatch.
+
+</details>
 
 ## Open judgment calls for the user (not yet decided)
 
