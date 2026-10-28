@@ -682,6 +682,56 @@ first redesign against a screenshot):** three more issues, all fixed:
 - **Not yet tested:** an actual Quest 2 headset, same outstanding item as
   every step since step 3.
 
+**Step 4 crack redesign, round 3 (same session, after Vincent compared the
+round-2 result against an older reference screenshot):** he wanted the
+cracks "broader... a bit more longer to the boarder" and the shine back to
+how an earlier in-browser prototype looked ("glowing, super good") rather
+than the round-2 version, which read as flatter. Root cause and fix:
+
+1. **The real problem was the material, not the color.** Round 2 built
+   each crack as two stacked `THREE.MeshBasicMaterial` meshes (a wide
+   translucent "glow" + a narrow opaque "core"), both flat solid colors.
+   Flat solid color with transparency reads as *dull*, not *glowing*, even
+   with the exact right hex value — there's no falloff. Replaced both with
+   a **single mesh per crack, UV-mapped to a shared gradient texture**
+   (`getCrackGlowTexture`, module-level cached `THREE.CanvasTexture`: an
+   8x128 canvas painted with a vertical gradient — transparent at the
+   edges, rising through the glow color, white-hot at the dead center) and
+   `THREE.AdditiveBlending`. A true soft falloff plus additive blending is
+   what actually reads as "glowing" — this was validated first by
+   live-patching the loaded page (building one prototype ribbon with the
+   gradient texture before touching `index.html`) and only ported into the
+   real `copito.buildCrackDecal`/`buildCrackRibbonMesh` once the live
+   result matched what Vincent had asked for.
+2. **Broader + longer:** `CONFIG.crackCoreWidth`/`crackGlowWidth`/
+   `crackGlowOpacity` (two separate widths for the old two-mesh approach)
+   collapsed into one `CONFIG.crackWidth: 0.09` (up from the old
+   0.02/0.05) for the new single-mesh ribbon, and every slot's `sweep` in
+   `CRACK_SLOTS` was widened (torso slots 1-4: 85°/70°→100°/85°, upper
+   slots 6/7: 48°→60°) so each crack reaches further around the body
+   toward its edge, per "make it a bit more longer to the boarder."
+3. **`CONFIG.colors.crackCore` dropped** — the old dark "core" color is no
+   longer needed since the gradient texture's own white-hot center
+   supplies that contrast; only `crackGlow` ('#7DF9FF', unchanged) remains.
+- **Tested this session:** fresh-tab console clean throughout (ruled out
+  the known stale-console-NaN red herring by cross-checking a new tab, see
+  the lesson above); `buildCrackDecal` confirmed returning a single `Mesh`
+  with the gradient texture as its `map` for every slot; full hit
+  progression driven through the real `onHit` path (not just manually
+  toggling decals) for type 3 — hit 1 shows slot 1 only, hit 2 adds slot 2,
+  hit 3 fires `snowman-destroyed` and resets `hitCount`/hides all decals —
+  each state screenshotted and visually matching the broader/glowing look
+  Vincent approved; type 7 checked separately with all six slots shown at
+  once to confirm the wider sweep doesn't make them collide awkwardly.
+- **Lesson:** debugging a camera framing issue during this round's
+  screenshot testing (a hand-rolled test camera facing backwards despite a
+  mathematically-verified-correct quaternion) burned real time before
+  switching to just repositioning the scene's existing default camera
+  entity instead of fighting a new one — same category as the earlier
+  near-clip lesson: when a screenshot looks wrong, suspect the *camera
+  setup* before the geometry, and prefer reusing a camera A-Frame is
+  already driving over hand-building a new one when scripting tests.
+
 <details>
 <summary>Original step 4 brief (superseded by the DONE notes above)</summary>
 

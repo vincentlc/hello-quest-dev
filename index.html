@@ -222,10 +222,8 @@
       // spans roughly chin-height down to the top of the scarf.
       crackUpperCenter: { x: 0, y: 0.88, z: -0.02 },
       crackUpperRadius: 0.27,
-      crackSamples: 16,       // points per curve -- smooths the ribbon
-      crackCoreWidth: 0.02,   // meters
-      crackGlowWidth: 0.05,
-      crackGlowOpacity: 0.3,
+      crackSamples: 20,      // points per curve -- smooths the ribbon
+      crackWidth: 0.09,      // meters -- broad, per Vincent's request
 
       // Hit squash/wobble (step 4) rotate/scale around this point instead
       // of the model wrapper's own raw origin. The wrapper's local origin
@@ -266,10 +264,12 @@
         crownCyan: '#7DF9FF',
         sparkle: '#B8FFF4',
         snowball: '#F4FFFD',
-        // Crack ribbons (step 4): dark core + bright icy glow, same colors
-        // across every slot (Vincent's call -- the earlier per-slot
-        // rainbow palette didn't match his reference).
-        crackCore: '#0A2A28',
+        // Crack ribbons (step 4): one icy glow color, same across every
+        // slot (Vincent's call -- the earlier per-slot rainbow palette
+        // didn't match his reference). The gradient texture itself (see
+        // getCrackGlowTexture) fades this color out at the edges and up to
+        // white-hot at the center, so no separate dark "core" color is
+        // needed anymore.
         crackGlow: '#7DF9FF'
       }
     };
@@ -621,8 +621,8 @@
     // ---------------------------------------------------------------------
     // CRACK_MASTER_ORDER / CRACK_SLOTS / getCrackSlotsForLives: Vincent's
     // reference sketch -- six possible crack "slots", each a fixed crossing
-    // angle/sweep/group, all one shared color (CONFIG.colors.crackCore/
-    // crackGlow). Slots 1-4 cross through the torso's central point
+    // angle/sweep/group, all one shared glow color (CONFIG.colors.crackGlow).
+    // Slots 1-4 cross through the torso's central point
     // (group 'torso'); 6/7 cross through a separate, lower point near the
     // chin/scarf (group 'upper') -- not all six piling onto one spot, which
     // looked too busy once several were active at once. A snowman's type
@@ -637,12 +637,12 @@
     // ---------------------------------------------------------------------
     var CRACK_MASTER_ORDER = [6, 7, 3, 4, 1, 2];
     var CRACK_SLOTS = {
-      1: { angle: -20, sweep: 85, group: 'torso' },
-      2: { angle: 20, sweep: 85, group: 'torso' },
-      3: { angle: -45, sweep: 70, group: 'torso' },
-      4: { angle: 45, sweep: 70, group: 'torso' },
-      6: { angle: -45, sweep: 48, group: 'upper' },
-      7: { angle: 45, sweep: 48, group: 'upper' }
+      1: { angle: -20, sweep: 100, group: 'torso' },
+      2: { angle: 20, sweep: 100, group: 'torso' },
+      3: { angle: -45, sweep: 85, group: 'torso' },
+      4: { angle: 45, sweep: 85, group: 'torso' },
+      6: { angle: -45, sweep: 60, group: 'upper' },
+      7: { angle: 45, sweep: 60, group: 'upper' }
     };
 
     function getCrackSlotsForLives(lives) {
@@ -653,6 +653,45 @@
       var snapped = valid.reduce((a, b) => Math.abs(b - lives) < Math.abs(a - lives) ? b : a);
       var count = Math.max(0, snapped - 1);
       return CRACK_MASTER_ORDER.slice(CRACK_MASTER_ORDER.length - count);
+    }
+
+    // ---------------------------------------------------------------------
+    // crackGlowTexture: a soft cross-section gradient (transparent edges,
+    // glow color rising toward the middle, bright white-hot at the dead
+    // center) painted once and shared by every crack ribbon -- mapped
+    // along each ribbon's width (v: 0 to 1 edge to edge) and repeated
+    // uniformly along its length (u), it's what actually gives the ribbon
+    // its shine/glow. The earlier ribbon version used a flat solid color
+    // instead of this gradient and read as dull/flat by comparison even
+    // with identical hex colors -- a true soft falloff is what reads as
+    // "glowing", not just the right hue.
+    // ---------------------------------------------------------------------
+    var crackGlowTexture = null;
+    function getCrackGlowTexture() {
+      if (crackGlowTexture) return crackGlowTexture;
+      var hex = CONFIG.colors.crackGlow;
+      var r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+      var glow = (a) => 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+      var h = 128;
+      var canvas = document.createElement('canvas');
+      canvas.width = 8; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      var grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0.00, glow(0));
+      grad.addColorStop(0.12, glow(0.25));
+      grad.addColorStop(0.32, glow(0.55));
+      grad.addColorStop(0.46, 'rgba(255,255,255,0.95)');
+      grad.addColorStop(0.50, 'rgba(255,255,255,1)');
+      grad.addColorStop(0.54, 'rgba(255,255,255,0.95)');
+      grad.addColorStop(0.68, glow(0.55));
+      grad.addColorStop(0.88, glow(0.25));
+      grad.addColorStop(1.00, glow(0));
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 8, h);
+      crackGlowTexture = new AFRAME.THREE.CanvasTexture(canvas);
+      crackGlowTexture.wrapS = AFRAME.THREE.ClampToEdgeWrapping;
+      crackGlowTexture.wrapT = AFRAME.THREE.ClampToEdgeWrapping;
+      return crackGlowTexture;
     }
 
     // ---------------------------------------------------------------------
@@ -1083,10 +1122,10 @@
       // One decal per active slot for this snowman's type
       // (getCrackSlotsForLives(CONFIG.hitsToExplode)), built once hidden
       // and just toggled visible as hitCount climbs / on reset, rather
-      // than created and torn down each time. Each is a THREE.Group (core +
-      // glow ribbon mesh, see buildCrackRibbonMeshes) added directly to
-      // `this.model.object3D` -- raw three.js objects, not a-frame
-      // entities, since the geometry is custom-built per crack rather than
+      // than created and torn down each time. Each is a single THREE.Mesh
+      // (a UV-mapped glow ribbon, see buildCrackRibbonMesh) added directly
+      // to `this.model.object3D` -- a raw three.js object, not an a-frame
+      // entity, since the geometry is custom-built per crack rather than
       // a plain primitive. Parented inside the model (not `this.el`) so
       // they move with every body animation, same reasoning as the
       // original flat-decal version: see worldToModelLocal's comment.
@@ -1118,27 +1157,29 @@
           curve.push({ point: center.clone().addScaledVector(dir, radius), normal: dir });
         }
 
-        var group = new THREE.Group();
-        group.add(this.buildCrackRibbonMesh(curve, CONFIG.crackGlowWidth, CONFIG.colors.crackGlow, CONFIG.crackGlowOpacity));
-        group.add(this.buildCrackRibbonMesh(curve, CONFIG.crackCoreWidth, CONFIG.colors.crackCore, 1));
-        group.visible = false;
-        this.model.object3D.add(group);
-        return group;
+        var mesh = this.buildCrackRibbonMesh(curve, CONFIG.crackWidth);
+        mesh.visible = false;
+        this.model.object3D.add(mesh);
+        return mesh;
       },
 
-      // One ribbon (ladder of quads following `curve`, width wide, flat
-      // solid color) -- called twice per crack, once for the glow (wide,
-      // translucent) and once for the core (narrow, opaque), stacked in a
-      // group. The cross-section direction at each point uses that
-      // sample's own outward normal, not a single fixed "up" vector -- a
-      // fixed axis flips sign as the curve sweeps around the body and
-      // pinches the ribbon into a bowtie; the normal varies smoothly with
-      // the curve instead. Vertices are converted to the model's raw/
-      // pre-scale local space (worldToModelLocal) so the mesh can be
-      // parented directly inside `this.model.object3D`.
-      buildCrackRibbonMesh: function (curve, width, color, opacity) {
+      // One ribbon (ladder of quads following `curve`, crackWidth wide)
+      // with a UV-mapped gradient glow texture (getCrackGlowTexture) and
+      // additive blending -- this is what gives the crack its shine: a
+      // true soft falloff (transparent edges -> glow color -> white-hot
+      // center) reads as "glowing" in a way a flat solid-color translucent
+      // mesh never does, even with the identical hex color. The
+      // cross-section direction at each point uses that sample's own
+      // outward normal, not a single fixed "up" vector -- a fixed axis
+      // flips sign as the curve sweeps around the body and pinches the
+      // ribbon into a bowtie; the normal varies smoothly with the curve
+      // instead. Vertices are converted to the model's raw/pre-scale local
+      // space (worldToModelLocal) so the mesh can be parented directly
+      // inside `this.model.object3D`.
+      buildCrackRibbonMesh: function (curve, width) {
         var THREE = AFRAME.THREE;
         var positions = [];
+        var uvs = [];
         for (var i = 0; i < curve.length; i++) {
           var tangent = (i < curve.length - 1 ? curve[i + 1].point : curve[i].point).clone()
             .sub(i < curve.length - 1 ? curve[i].point : curve[i - 1].point).normalize();
@@ -1146,6 +1187,8 @@
           var edgeA = this.worldToModelLocal(curve[i].point.clone().add(side));
           var edgeB = this.worldToModelLocal(curve[i].point.clone().sub(side));
           positions.push(edgeA.x, edgeA.y, edgeA.z, edgeB.x, edgeB.y, edgeB.z);
+          var u = i / (curve.length - 1);
+          uvs.push(u, 0, u, 1);
         }
         var indices = [];
         for (var i = 0; i < curve.length - 1; i++) {
@@ -1154,10 +1197,11 @@
         }
         var geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
         geo.setIndex(indices);
         var mat = new THREE.MeshBasicMaterial({
-          color: new THREE.Color(color), side: THREE.DoubleSide,
-          transparent: opacity < 1, opacity: opacity, depthWrite: opacity >= 1
+          map: getCrackGlowTexture(), side: THREE.DoubleSide,
+          transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
         });
         return new THREE.Mesh(geo, mat);
       },
