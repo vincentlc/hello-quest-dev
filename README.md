@@ -19,8 +19,9 @@ cd ~/Documents/Code/GitHub/hello-quest-dev
 python3 -m http.server 8080
 ```
 
-Open `http://localhost:8080`. The game can be played with mouse/keyboard;
-the same scene also supports Quest controllers in VR.
+Open `http://localhost:8080`. On desktop, move the mouse to look around,
+use W/S or Up/Down to move forward/back, and use Left/Right or A/D to turn.
+The same scene also supports Quest controllers in VR.
 
 ## Run it on Meta Quest 2 (over USB)
 

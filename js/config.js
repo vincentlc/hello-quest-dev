@@ -1,8 +1,11 @@
 // ---------------------------------------------------------------------
 // CONFIG: every tunable number in one place. Change these, reload, done.
-// Units: meters, seconds, m/s.
+// Units: meters, seconds, m/s, and degrees/second where named.
 // ---------------------------------------------------------------------
 export var CONFIG = {
+  // Desktop keyboard turning
+  desktopTurnSpeedDegPerSec: 90,
+
   // Snowman placement and size
   snowmanDistance: -5,      // meters in front of the player
   snowmanHeight: 1.6,       // approx total height, for reference when tuning parts

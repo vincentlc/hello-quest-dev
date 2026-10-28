@@ -10,6 +10,11 @@ new development straight to `main`.
 
 - Before starting a step's work, create a branch off `main` (e.g.
   `step-4-hit-reactions`, `fix-trajectory-dots`).
+- First refresh from GitHub: run `git fetch origin`, then update local
+  `main` with `git pull --ff-only origin main` before creating the feature
+  branch. Never branch from a stale local `main`. When resuming an existing
+  feature branch, fetch first and integrate the latest `origin/main` when
+  it has advanced.
 - Commit the work on that branch as it's completed.
 - Push the branch and open a pull request against `main` (use `gh pr create`
   if the `gh` CLI is available; otherwise push the branch and hand the user
