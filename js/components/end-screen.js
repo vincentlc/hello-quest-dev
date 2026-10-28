@@ -1,6 +1,7 @@
 import { CONFIG } from '../config.js';
 import { I18N, LANG, MODEL_CREDIT } from '../i18n.js';
 import { buildPanel, placeFacingCamera } from '../core/vr-panel.js';
+import { getBestScore, updateBestScore } from '../core/best-score.js';
 
 // ---------------------------------------------------------------------
 // end-screen (step 7, new): lives on <a-scene>, alongside
@@ -30,8 +31,12 @@ AFRAME.registerComponent('end-screen', {
 
     this.built = buildPanel(this.el, {
       width: CONFIG.creditsPanelWidth,
-      height: CONFIG.creditsPanelHeight,
-      borderColor: CONFIG.colors.crownCyan
+      borderColor: CONFIG.colors.crownCyan,
+      // Worst-case content: score line, best-score/new-record line, a
+      // blank line, the creator credit, the CC-BY model credit (may
+      // wrap to 2), another blank line, then the restart hint (may
+      // wrap to 2) -- budget 10 so nothing in that combination clips.
+      bodyMaxLines: 10
     });
     this.panel = this.built.panel;
 
@@ -126,9 +131,12 @@ AFRAME.registerComponent('end-screen', {
     var panelPos = placeFacingCamera(this.panel, camera, CONFIG.creditsPanelDistance, -0.05);
 
     var lang = I18N[LANG];
+    var isNewBest = updateBestScore(score);
+    var bestLine = isNewBest ? lang.newRecord : lang.bestScore + ': ' + getBestScore();
+
     this.built.setTitle(lang.gameComplete);
     this.built.setBody(
-      lang.finalScore + ': ' + Math.round(score) + '\n\n' +
+      lang.finalScore + ': ' + Math.round(score) + '\n' + bestLine + '\n\n' +
       lang.createdBy + '\n' + MODEL_CREDIT + '\n\n' +
       lang.restartHint);
 

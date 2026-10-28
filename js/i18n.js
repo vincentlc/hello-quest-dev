@@ -12,8 +12,11 @@ export var I18N = {
     wave: 'Oleada',
     score: 'Puntos',
     welcomeTitle: '¡Bienvenido!',
+    welcomeSubtitle: 'Bienvenido a Snoworld Copito: el juego que desafía a los monos de nieve',
     gameComplete: '¡Juego completado!',
     finalScore: 'Puntuación final',
+    bestScore: 'Mejor puntaje',
+    newRecord: '¡Nuevo récord!',
     createdBy: 'Creado por Vincentlc',
     restartHint: 'Lanza una bola de nieve para volver a jugar'
   },
@@ -25,8 +28,11 @@ export var I18N = {
     wave: 'Wave',
     score: 'Score',
     welcomeTitle: 'Welcome!',
+    welcomeSubtitle: 'Welcome to Snoworld Copito: the game that takes on the snowmen',
     gameComplete: 'Game complete!',
     finalScore: 'Final score',
+    bestScore: 'Best score',
+    newRecord: 'New record!',
     createdBy: 'Created by Vincentlc',
     restartHint: 'Throw a snowball to play again'
   }

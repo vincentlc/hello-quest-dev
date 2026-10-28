@@ -47,8 +47,9 @@ Keep that in mind before calling anything "done" in the VR-comfort sense.
 | 10 | Per-difficulty snowman textures + bigger type-7 | ⬜ Not started |
 | 11 | Landscape progression after wave 5 / wave 10 | ⬜ Not started |
 | 12 | Lose condition: snowmen approach + touch the player | ⬜ Not started |
+| 13 | Scoring: accuracy bonus | ⬜ Not started |
 
-Steps 9-12 were scoped in a planning session on 2026-10-28; full
+Steps 9-13 were scoped in a planning session on 2026-10-28; full
 implementation detail for each lives inline in its own entry below in
 "Step-by-step status" — written so a cold session can execute directly from
 this file. Step 12 ships in two phases, in this order: a standard/softer
@@ -1395,6 +1396,95 @@ headset** — same outstanding item as every step since step 3, and
 bug report made from real on-device use; the fix is reasoned from lens/FOV
 geometry, not re-confirmed on the hardware that reported it.
 
+**Step 7 follow-up round 1 (same session, after the user tried the above
+on their own machine):** two real rendering bugs found and fixed, plus one
+requested polish item:
+
+1. **Text was unreadable "aplastado" (squashed) vertically** on the
+   welcome panel's instruction line (not on `wave-hud`, which happened to
+   look fine). Root cause: a canvas-text plane's canvas pixel
+   width:height ratio has to match its `PlaneGeometry`'s physical
+   width:height ratio, or the texture gets non-uniformly stretched when
+   mapped onto the mesh -- `wave-hud`'s card accidentally already matched
+   (0.46/0.2 plane aspect vs ~0.46/0.2 canvas aspect, coincidence), but
+   `vr-panel.js`'s title/body planes used independently-guessed world
+   sizes and canvas pixel sizes that didn't correspond for a short, wide
+   body plane like welcome's. Fixed by rewriting `buildPanel` to *derive*
+   title/body/subtitle height from font size x a line-count budget, using
+   one shared width-derived pixel density for every plane in the panel --
+   the canvas and the mesh it's painted on are aspect-matched by
+   construction now, not by coincidence, so this class of bug can't recur
+   even as content/line-budgets change later. Panel height (`CONFIG.
+   creditsPanelHeight`/`welcomePanelHeight`, removed) is computed from
+   content now instead of being a separately-maintained guess.
+2. **Pixelated/blocky text up close**, reported from a real desktop
+   browser zoom, not just this project's own headless-pane testing. Cause:
+   the canvas backing each text/icon texture was sized for how big it
+   needed to be in *logical* pixels, not how many *texture texels* that
+   ends up being once magnified to the plane's displayed size -- not
+   enough texel density for a close look. Fixed with a
+   `RESOLUTION_SCALE` (2x) in `canvas-text.js`, applied internally (every
+   existing call site's canvasWidth/canvasHeight/fontSize/paddingX stay
+   the same "logical" numbers, scaling happens inside `createTextPlane`
+   itself) -- same fix mirrored in `controller-icon.js` (320px -> 640px
+   canvas) -- plus `texture.anisotropy = 8` on every such texture for
+   sharper off-angle viewing, since a world-space panel is rarely looked
+   at dead-on.
+3. **Welcome panel tagline, requested new:** a second line under the
+   title -- "Bienvenido a Snoworld Copito: el juego que desafía a los
+   monos de nieve" (the user's own phrasing; "monos de nieve" is Chilean
+   slang for snowmen, used deliberately, not a typo for "muñecos de
+   nieve"). `vr-panel.buildPanel` gained an optional subtitle region
+   (`subtitleMaxLines`, 0 by default so end-screen is unaffected) between
+   title and body, same content-driven sizing as the rest of the panel.
+   New `I18N.welcomeSubtitle` (es/en).
+- **Tested this session:** fresh-tab console clean across every reload;
+  welcome panel's instruction text confirmed no longer stretched
+  (screenshots compared before/after); the new subtitle wraps to 2 lines
+  and reads clearly at the new resolution; end-screen re-verified still
+  correct (score/credit/restart lines all legible, accents intact) after
+  the `buildPanel` rewrite. **Not yet tested: an actual Quest 2 headset**,
+  same outstanding item as the rest of this step.
+
+**Step 7 follow-up round 2 (same session, after the user asked how
+scoring works and what could improve):** three scoring changes, two
+implemented now, one deliberately deferred to step 13 (see that step's
+entry) per the user's own call ("me parece, pero quizás lo ponemos en
+progress como otra etapa").
+
+1. **Best score, persisted.** New `js/core/best-score.js`
+   (`getBestScore`/`updateBestScore`, `localStorage`, try/catch-guarded
+   the same way haptics are elsewhere in this project -- losing this is
+   cosmetic, not worth a hard failure over). `end-screen.show` now also
+   shows either "Mejor puntaje: N" or, if the run's final score beat the
+   stored best, "¡Nuevo récord!" instead. New `I18N.bestScore`/
+   `newRecord` (es/en). `bodyMaxLines` on the end-screen panel raised
+   8 -> 10 to fit the extra line without clipping (content-driven sizing
+   from the round-1 fix means this is the only number that needed
+   touching).
+2. **Wave-clear time bonus now scales with wave size**, instead of every
+   wave competing for the same flat 30-point/30-second budget regardless
+   of how many snowmen it threw at the player. `wave-director` now
+   remembers `waveSnowmanCount` at `startWave` (needed at
+   `scheduleNextWave` time, by which point `aliveThisWave` has already
+   decremented to 0) and grants `CONFIG.waveSoftTimerSecondsPerSnowman`
+   (5) free seconds plus `CONFIG.waveSoftTimerBonusPerSnowman` (10) max
+   bonus points *per snowman in that wave* -- a 7-snowman wave can now
+   earn up to 70 bonus points with a 35-second free window, instead of
+   being squeezed against the exact same 30-point/30-second budget as
+   wave 1's lone snowman. Replaces the old flat `CONFIG.
+   waveSoftTimerBonusMax`.
+3. **Accuracy bonus (reward a clean kill or a no-miss wave) -- not
+   implemented**, scoped instead as step 13 (its own entry further down
+   this file) per the user's explicit request to track it as a separate
+   future step rather than build it into this commit.
+- **Tested this session:** scripted a 7-snowman wave clear at 10 seconds
+  taken (under its new 35s free window) and confirmed the full 70-point
+  bonus applied (score math: 1234 base + 50 clear + 70 time = 1354,
+  matched exactly on the end screen); confirmed "¡Nuevo récord!" shows
+  after clearing `localStorage`'s stored best, and "Mejor puntaje: 1354"
+  shows (not the record line) on a second `show()` call with a lower
+  score; zero console errors throughout.
 
 </details>
 
@@ -1751,6 +1841,49 @@ manual-event-emit technique already used to test `snowman-hit`/
 `snowman-destroyed` in earlier steps) and confirm the overlay fades in and
 back out over the camera view without blocking the HUD text or making the
 scene unreadable at peak opacity.
+
+</details>
+
+<details>
+<summary><strong>Step 13 — scoring: accuracy bonus (⬜ Not started)</strong></summary>
+
+**Scoped 2026-10-28, not yet implemented** (requested alongside the step 7
+scoring improvements below, but deliberately deferred to its own step
+rather than folded in -- the user's call: "me parece [buena idea], pero
+quizás lo ponemos en progress como otra etapa"). Idea: reward *accuracy*,
+not just survival/speed -- right now a miss costs nothing (see step 4's
+snowball packing/landing system, misses just pile up on the ground), so a
+player spamming throws scores identically to one aiming carefully, besides
+the wave-clear time bonus (step 7) which only rewards overall wave speed,
+not per-target precision.
+
+Two options floated, not yet chosen between:
+
+1. **Per-snowman "clean kill" bonus**: extra points if a snowman was
+   destroyed without any snowball fired at it missing (tracked per
+   registered snowman -- `copitoRegistry`, see `js/registry/
+   copito-registry.js`, already has one entry per active snowman;
+   `snowball-thrower.findHitSnowman` already knows which snowman a given
+   flying snowball was aimed near when it misses, though "aimed near"
+   vs "truly aimed at that one" would need a definition for multi-snowman
+   waves where more than one target is in a throw's rough path).
+2. **Wave-level "no misses" streak**: track total throws vs total hits for
+   the whole wave (simpler to implement -- `snowball-thrower` already
+   knows every throw via the `snowball-thrown` event added in step 7, and
+   every hit via `snowball-hit`), bonus if the ratio is 100% (or above some
+   threshold) when the wave clears.
+
+Option 2 is simpler and doesn't need per-snowman attribution, so it's the
+likely starting point unless the user asks for the more granular per-kill
+version. Either way: new `CONFIG` constant(s) for the bonus amount, wired
+into `wave-director`'s existing `onSnowmanDestroyed`/`scheduleNextWave`
+scoring path (same place the step 7 per-kill and time bonuses live), and a
+new counter somewhere tracking throws-vs-hits per wave (reset in
+`startWave`). Should show up on the end screen's score breakdown
+eventually too, once there is one (today's end screen just shows one
+final total, see step 7 -- if accuracy bonus lands, consider breaking the
+total into separate score-breakdown lines there, since multiple bonus
+sources are getting hard to infer from one number).
 
 </details>
 

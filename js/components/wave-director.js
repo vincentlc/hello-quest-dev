@@ -98,6 +98,10 @@ AFRAME.registerComponent('wave-director', {
     var points = pickSpawnPoints(waveCfg.count, origin, forward);
 
     this.aliveThisWave = waveCfg.count;
+    // Remembered for scheduleNextWave's time-bonus calc below --
+    // aliveThisWave itself is decremented to 0 by the time that runs,
+    // so the snowman count needs its own copy.
+    this.waveSnowmanCount = waveCfg.count;
     for (var i = 0; i < waveCfg.count; i++) {
       var type = waveCfg.types[i % waveCfg.types.length];
       var entry = this.getPoolEntity(type);
@@ -141,9 +145,21 @@ AFRAME.registerComponent('wave-director', {
     if (entry) entry.inUse = false;
   },
 
+  // Soft time bonus, scaled to the wave's own size (step 7 improvement
+  // -- originally a flat budget regardless of snowman count, which
+  // unfairly squeezed later/bigger waves against the same clock as
+  // wave 1's single snowman). Each snowman in the wave grants
+  // `waveSoftTimerSecondsPerSnowman` seconds of "free" time before the
+  // bonus starts decaying, and raises the max bonus pool by
+  // `waveSoftTimerBonusPerSnowman` -- a 7-snowman wave can earn up to
+  // 7x a 1-snowman wave's bonus, with proportionally more time to earn
+  // it in, instead of competing for the exact same fixed pool/window.
   scheduleNextWave: function () {
     var secondsTaken = (performance.now() - this.waveStartAt) / 1000;
-    var softBonus = Math.max(0, CONFIG.waveSoftTimerBonusMax - secondsTaken * CONFIG.waveSoftTimerDecayPerSecond);
+    var allowedSeconds = CONFIG.waveSoftTimerSecondsPerSnowman * this.waveSnowmanCount;
+    var maxBonus = CONFIG.waveSoftTimerBonusPerSnowman * this.waveSnowmanCount;
+    var overTime = Math.max(0, secondsTaken - allowedSeconds);
+    var softBonus = Math.max(0, maxBonus - overTime * CONFIG.waveSoftTimerDecayPerSecond);
     this.score += CONFIG.waveClearBonus + softBonus;
     console.log('[wave-director] wave ' + (this.waveIndex + 1) + ' cleared, score ' + Math.round(this.score));
     this.emitState();

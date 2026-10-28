@@ -25,7 +25,7 @@ function roundedRect(ctx, x, y, w, h, r) {
 export function getControllerIconTexture() {
   if (cached) return cached;
 
-  var size = 320;
+  var size = 640; // 2x the original resolution -- see canvas-text.js's RESOLUTION_SCALE note
   var canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -79,6 +79,7 @@ export function getControllerIconTexture() {
 
   var texture = new AFRAME.THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
+  texture.anisotropy = 8;
   cached = texture;
   return texture;
 }

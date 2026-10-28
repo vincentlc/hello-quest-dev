@@ -187,8 +187,14 @@ export var CONFIG = {
   // Soft, low-stakes time bonus for clearing a wave quickly -- no fail
   // state, no countdown UI, per the user ("could be soft time but not
   // too exigent... nor important for now"). Decays linearly to 0, never
-  // negative.
-  waveSoftTimerBonusMax: 30,
+  // negative. Step 7 improvement: scaled per snowman in the wave
+  // (wave-director.scheduleNextWave) rather than one flat budget for
+  // every wave regardless of size -- each snowman grants this many
+  // "free" seconds before the bonus starts decaying, and this many
+  // extra max-bonus points, so a big late-game wave isn't squeezed
+  // against the same clock as wave 1's single snowman.
+  waveSoftTimerSecondsPerSnowman: 5,
+  waveSoftTimerBonusPerSnowman: 10,
   waveSoftTimerDecayPerSecond: 1,
 
   // End-of-run credits screen (step 7). Modular on purpose: once
@@ -202,10 +208,13 @@ export var CONFIG = {
   // World-space placement/size for that panel -- spawned once in front
   // of wherever the player is looking at the moment the game completes
   // (not head-locked, see end-screen.js), so it reads like a sign
-  // placed in the world rather than UI glued to your eyes.
-  creditsPanelDistance: 2.2,
-  creditsPanelWidth: 1.7,
-  creditsPanelHeight: 1.05,
+  // placed in the world rather than UI glued to your eyes. Height isn't
+  // configured here -- vr-panel.js's buildPanel derives it from the
+  // actual title/body font sizes and line budgets, so it can never end
+  // up out of proportion with the text it has to hold (see that file's
+  // class comment for why that matters).
+  creditsPanelDistance: 2.0,
+  creditsPanelWidth: 2.0,
   creditsParticleCount: 90,
 
   // Welcome/intro panel (step 7, new): shown once right after load,
@@ -214,9 +223,8 @@ export var CONFIG = {
   // the trigger -- see welcome-screen.js/controller-icon.js. Dismissed
   // by the player's own first throw, or this timeout if they never
   // throw, so it never lingers forever.
-  welcomePanelDistance: 1.8,
-  welcomePanelWidth: 1.3,
-  welcomePanelHeight: 0.85,
+  welcomePanelDistance: 1.7,
+  welcomePanelWidth: 1.6,
   welcomeAutoHideSeconds: 14,
 
   // Sound volumes 0 to 1 (step 6)

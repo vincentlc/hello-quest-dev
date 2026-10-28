@@ -25,21 +25,23 @@ AFRAME.registerComponent('welcome-screen', {
     this.active = false;
     this.dismissed = false;
 
+    var iconSize = 0.4;
+    var iconGap = 0.12;
     this.built = buildPanel(this.el, {
       width: CONFIG.welcomePanelWidth,
-      height: CONFIG.welcomePanelHeight,
       borderColor: CONFIG.colors.crownCyan,
-      bodyY: 0.06,
-      bodyHeight: 0.3
+      subtitleMaxLines: 3, // the "Snoworld Copito" tagline, may wrap a couple times
+      bodyMaxLines: 2, // the instruction sentence may wrap once (VR phrasing is long)
+      extraBottom: iconGap + iconSize + 0.08 // reserve room below the body for the controller icon
     });
     this.panel = this.built.panel;
 
     var THREE = AFRAME.THREE;
     this.icon = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.3, 0.3),
+      new THREE.PlaneGeometry(iconSize, iconSize),
       new THREE.MeshBasicMaterial({ map: getControllerIconTexture(), transparent: true, depthWrite: false })
     );
-    this.icon.position.set(0, -CONFIG.welcomePanelHeight / 2 + 0.17, 0.02);
+    this.icon.position.set(0, this.built.bodyBottomY - iconGap - iconSize / 2, 0.02);
     this.icon.renderOrder = 1; // draw after the backdrop -- see vr-panel.js's renderOrder note
     this.panel.object3D.add(this.icon);
 
@@ -65,6 +67,7 @@ AFRAME.registerComponent('welcome-screen', {
   refreshText: function () {
     var lang = I18N[LANG];
     this.built.setTitle(lang.welcomeTitle);
+    this.built.setSubtitle(lang.welcomeSubtitle);
     this.built.setBody(this.el.is('vr-mode') ? lang.instructionVR : lang.instructionDesktop);
   },
 

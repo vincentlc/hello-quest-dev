@@ -23,19 +23,35 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// RESOLUTION_SCALE: every text/icon canvas in this file is rendered at
+// this multiple of its "logical" pixel size (callers keep passing the
+// same canvasWidth/canvasHeight/fontSize/paddingX numbers as before --
+// scaling happens internally). Found needed after shipping: at 1x, a
+// close-up/zoomed look at the panel on a real display showed visibly
+// blocky/pixelated glyph edges -- the canvas's own texel density was
+// the limit, not blur from magnification filtering. Backing the same
+// displayed (world-meters) size with ~4x the pixel area via this scale
+// fixes that; three.js's default LinearFilter still smooths between
+// those now-finer texels instead of a human seeing individual ones.
+var RESOLUTION_SCALE = 2;
+
 // opts: { width, height (world meters), canvasWidth, canvasHeight,
 // text, align, color, fontSize, bold, background, backgroundRadius,
-// paddingX, startY }. Returns { mesh, setText(text, overrideOpts) }.
+// paddingX, startY }. canvasWidth/canvasHeight/fontSize/paddingX/startY
+// are "logical" pixels -- RESOLUTION_SCALE is applied internally, so
+// existing call sites don't need to change. Returns { mesh,
+// setText(text, overrideOpts) }.
 export function createTextPlane(opts) {
   var THREE = AFRAME.THREE;
   var baseOpts = opts;
   var canvas = document.createElement('canvas');
-  canvas.width = opts.canvasWidth || 1024;
-  canvas.height = opts.canvasHeight || 512;
+  canvas.width = (opts.canvasWidth || 1024) * RESOLUTION_SCALE;
+  canvas.height = (opts.canvasHeight || 512) * RESOLUTION_SCALE;
   var ctx = canvas.getContext('2d');
 
   var texture = new THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
+  texture.anisotropy = 8; // sharper at the oblique angles a world-space panel is often viewed from
 
   var mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(opts.width, opts.height),
@@ -48,21 +64,31 @@ export function createTextPlane(opts) {
 
     if (o.background) {
       ctx.fillStyle = o.background;
-      roundRectPath(ctx, 0, 0, canvas.width, canvas.height, o.backgroundRadius || 0);
+      roundRectPath(ctx, 0, 0, canvas.width, canvas.height, (o.backgroundRadius || 0) * RESOLUTION_SCALE);
       ctx.fill();
     }
 
-    var fontSize = o.fontSize || Math.round(canvas.height * 0.14);
+    var fontSize = (o.fontSize || Math.round(canvas.height * 0.14 / RESOLUTION_SCALE)) * RESOLUTION_SCALE;
     var lineHeight = fontSize * 1.3;
     var align = o.align || 'center';
     var color = o.color || '#FFFFFF';
     var weight = o.bold ? 'bold ' : '';
-    var paddingX = o.paddingX !== undefined ? o.paddingX : 20;
+    var paddingX = (o.paddingX !== undefined ? o.paddingX : 20) * RESOLUTION_SCALE;
 
     ctx.font = weight + fontSize + 'px "Trebuchet MS", "Segoe UI", Arial, sans-serif';
     ctx.fillStyle = color;
     ctx.textBaseline = 'middle';
     ctx.textAlign = align;
+    // Soft drop shadow -- the panel sits over a busy, bright snow/sky
+    // background, and flat white text on a semi-transparent backdrop
+    // read as faint/hard to read once actually tested (reported:
+    // "no se lee muy bien el texto"). A dark shadow behind each glyph
+    // gives it a crisp edge regardless of what's behind the panel.
+    if (o.shadow !== false) {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+      ctx.shadowBlur = fontSize * 0.08;
+      ctx.shadowOffsetY = fontSize * 0.04;
+    }
 
     // Word-wrap: explicit '\n's are kept as hard breaks (used for
     // blank-line spacing between sections, e.g. the end-screen's
@@ -92,7 +118,7 @@ export function createTextPlane(opts) {
 
     var x = align === 'center' ? canvas.width / 2
       : (align === 'right' ? canvas.width - paddingX : paddingX);
-    var startY = o.startY !== undefined ? o.startY
+    var startY = o.startY !== undefined ? o.startY * RESOLUTION_SCALE
       : canvas.height / 2 - (lines.length - 1) * lineHeight / 2;
 
     lines.forEach(function (line, i) {

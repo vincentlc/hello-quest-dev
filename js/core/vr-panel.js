@@ -25,11 +25,55 @@ import { createTextPlane } from './canvas-text.js';
 // correctly drawn into its own canvas the whole time. Explicit
 // renderOrder forces text after backdrop/border regardless of attach
 // timing.
+//
+// Panel/text HEIGHT is derived from content, not guessed independently
+// of it -- a real bug found after shipping: a text plane's canvas
+// pixel-aspect-ratio has to match its PlaneGeometry's physical
+// width/height aspect-ratio, or the texture gets non-uniformly
+// stretched (reported: "se ve como aplastado verticalmente" -- a short,
+// wide body plane squashing its own text vertically because its canvas
+// was authored much taller, proportionally, than the plane it was
+// mapped onto). Rather than hand-pick a world-meters height and a
+// canvas pixel height separately and hope they stay in proportion,
+// both title and body height are computed FROM their font size and a
+// line-count budget, using one shared width-derived pixel density
+// (pxPerMeter) -- so the canvas and the plane it's painted on are
+// aspect-matched by construction, for any width/font-size/line-count
+// combination, not just the ones tested so far.
 // ---------------------------------------------------------------------
 export function buildPanel(parentEl, opts) {
   var w = opts.width;
-  var h = opts.height;
   var borderColor = opts.borderColor;
+  var contentWidth = w - 0.2;
+  var pxPerMeter = 1024 / contentWidth; // shared logical (pre-RESOLUTION_SCALE) density
+
+  var titleFontSize = opts.titleFontSize || 104;
+  var titleMaxLines = opts.titleMaxLines || 2; // headroom for an unexpectedly long title to wrap without clipping
+  var titleCanvasHeight = Math.round(titleFontSize * 1.3 * titleMaxLines + titleFontSize * 0.5);
+  var titleHeight = titleCanvasHeight / pxPerMeter;
+
+  // Subtitle is optional (0 lines = not built at all) -- only
+  // welcome-screen uses it today (the "Snoworld Copito" tagline under
+  // the title), end-screen doesn't pass it and gets no subtitle plane
+  // or extra height for one.
+  var subtitleFontSize = opts.subtitleFontSize || 34;
+  var subtitleMaxLines = opts.subtitleMaxLines || 0;
+  var subtitleCanvasHeight = subtitleMaxLines > 0
+    ? Math.round(subtitleFontSize * 1.3 * subtitleMaxLines + subtitleFontSize * 0.5) : 0;
+  var subtitleHeight = subtitleCanvasHeight / pxPerMeter;
+  var subtitleGap = subtitleMaxLines > 0 ? (opts.subtitleGap !== undefined ? opts.subtitleGap : 0.03) : 0;
+
+  var bodyFontSize = opts.bodyFontSize || 56;
+  var bodyMaxLines = opts.bodyMaxLines || 6;
+  var bodyCanvasHeight = Math.round(bodyFontSize * 1.3 * bodyMaxLines + bodyFontSize * 0.5);
+  var bodyHeight = bodyCanvasHeight / pxPerMeter;
+
+  var topMargin = opts.topMargin !== undefined ? opts.topMargin : 0.12;
+  var bottomMargin = opts.bottomMargin !== undefined ? opts.bottomMargin : 0.12;
+  var titleBodyGap = opts.titleBodyGap !== undefined ? opts.titleBodyGap : 0.05;
+  var extraBottom = opts.extraBottom || 0; // reserved space below the body (e.g. welcome's controller icon)
+
+  var h = topMargin + titleHeight + subtitleGap + subtitleHeight + titleBodyGap + bodyHeight + bottomMargin + extraBottom;
 
   var panel = document.createElement('a-entity');
   panel.setAttribute('visible', false);
@@ -47,22 +91,38 @@ export function buildPanel(parentEl, opts) {
   backdrop.setAttribute('material', 'color: #06201E; opacity: 0.88; shader: flat; side: double; fog: false');
   panel.appendChild(backdrop);
 
+  var titleY = h / 2 - topMargin - titleHeight / 2;
   var titlePlane = createTextPlane({
-    width: w - 0.2, height: 0.26,
-    canvasWidth: 1024, canvasHeight: 256,
-    text: '', align: 'center', color: borderColor, fontSize: 76, bold: true
+    width: contentWidth, height: titleHeight,
+    canvasWidth: 1024, canvasHeight: titleCanvasHeight,
+    text: '', align: 'center', color: borderColor, fontSize: titleFontSize, bold: true
   });
-  titlePlane.mesh.position.set(0, h / 2 - 0.16, 0.01);
+  titlePlane.mesh.position.set(0, titleY, 0.01);
   titlePlane.mesh.renderOrder = 1;
   panel.object3D.add(titlePlane.mesh);
 
-  var bodyHeight = opts.bodyHeight !== undefined ? opts.bodyHeight : h - 0.42;
+  var subtitlePlane = null;
+  var afterTitleY = titleY - titleHeight / 2;
+  if (subtitleMaxLines > 0) {
+    var subtitleY = afterTitleY - subtitleGap - subtitleHeight / 2;
+    subtitlePlane = createTextPlane({
+      width: contentWidth, height: subtitleHeight,
+      canvasWidth: 1024, canvasHeight: subtitleCanvasHeight,
+      text: '', align: 'center', color: '#CFEFFF', fontSize: subtitleFontSize
+    });
+    subtitlePlane.mesh.position.set(0, subtitleY, 0.01);
+    subtitlePlane.mesh.renderOrder = 1;
+    panel.object3D.add(subtitlePlane.mesh);
+    afterTitleY = subtitleY - subtitleHeight / 2;
+  }
+
+  var bodyY = afterTitleY - titleBodyGap - bodyHeight / 2;
   var bodyPlane = createTextPlane({
-    width: w - 0.2, height: bodyHeight,
-    canvasWidth: 1024, canvasHeight: 640,
-    text: '', align: 'center', color: '#FFFFFF', fontSize: 42
+    width: contentWidth, height: bodyHeight,
+    canvasWidth: 1024, canvasHeight: bodyCanvasHeight,
+    text: '', align: 'center', color: '#FFFFFF', fontSize: bodyFontSize
   });
-  bodyPlane.mesh.position.set(0, opts.bodyY !== undefined ? opts.bodyY : -0.02, 0.01);
+  bodyPlane.mesh.position.set(0, bodyY, 0.01);
   bodyPlane.mesh.renderOrder = 1;
   panel.object3D.add(bodyPlane.mesh);
 
@@ -71,7 +131,10 @@ export function buildPanel(parentEl, opts) {
     panel: panel,
     border: border,
     backdrop: backdrop,
+    height: h,
+    bodyBottomY: bodyY - bodyHeight / 2,
     setTitle: function (text) { titlePlane.setText(text); },
+    setSubtitle: function (text) { if (subtitlePlane) subtitlePlane.setText(text); },
     setBody: function (text) { bodyPlane.setText(text); }
   };
 }
