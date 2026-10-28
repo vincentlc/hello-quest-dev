@@ -13,6 +13,7 @@ export var CONFIG = {
   // centered and standing on the ground at CONFIG.snowmanHeight tall.
   copitoScale: 0.6324,
   copitoOffset: '-4.206 0.0574 3.6008',
+  bigSnowmanScaleMultiplier: 1.5,
 
   // Idle animation (step 2): bob + sway are added on top of
   // copitoOffset as deltas on the model wrapper, not the declarative
@@ -69,10 +70,8 @@ export var CONFIG = {
   // not any integer). One crack appears per hit up to the last one
   // (which explodes instead): type 1 explodes on the first hit with no
   // crack at all, type 3 shows 2 cracks, type 5 shows 4, type 7 shows
-  // all 6. Default 3; designed to go up to 7 later for a bigger
-  // snowman variant -- that bigger-body variant itself isn't built yet,
-  // this just keeps the hit/crack system from hard-coding "exactly 2"
-  // so raising this number alone will work.
+  // all 6. Default 3; type 7 also selects the larger snowman model
+  // scale and the toughest accessory texture.
   hitsToExplode: 3,
   chunkCount: 50,
   chunkSpeedMin: 2,
@@ -159,9 +158,8 @@ export var CONFIG = {
   hitPivotHeight: 0.8,
 
   // Wave director (step 5 bis, new -- not in the original spec): spawn
-  // points are sampled in a band inside the fog-clear zone (<a-scene>'s
-  // fog far: 7.9, above) and well inside the ground disc (<a-circle>'s
-  // radius: 9.5, above), in an arc around wherever the camera is
+  // points are sampled inside the ground disc (<a-circle>'s radius:
+  // 9.5, above), in an arc around wherever the camera is
   // currently facing (not a fixed world angle, so this still works if
   // the player ever gains locomotion -- see wave-director's class
   // comment). The arc widens with snowman count: small waves stay
@@ -175,6 +173,12 @@ export var CONFIG = {
   // point.
   waveMinSpawnRadius: 3,
   waveMaxSpawnRadius: 7,
+  // Some type-5/7 snowmen have a chance to spawn in the outer fog
+  // transition (fog starts at 4.5m and reaches full opacity at 7.9m),
+  // so they emerge as silhouettes without spawning past visibility.
+  fogSpawnMinType: 5,
+  fogSpawnChance: 0.6,
+  fogSpawnMinRadius: 6.1,
   waveMinSeparation: 1.4,        // meters between simultaneous spawn points in one wave
   waveArcNarrowDeg: 70,          // frontal arc for a single-snowman wave
   waveArcWideDeg: 150,           // frontal arc for a small multi-snowman wave

@@ -5,11 +5,11 @@ standing in a snowy field, built for Meta Quest 2 and desktop Chrome. Learning
 project — see `PROGRESS.md` for the full build log, what's done, and what's
 next.
 
-**Current status:** scene setup is done (vendored A-Frame, photo sky, matched
-ground, Copito's model placed and lit). Gameplay (throwing snowballs, hit
-reactions, explosion, sound, HUD) is not built yet — see `PROGRESS.md` for
-the step-by-step plan. This README will grow with controls and `CONFIG`
-tuning notes as those steps land.
+**Current status:** core gameplay is implemented: snowball throwing, hit
+reactions, explosions, waves, and HUD. Snowman toughness is signaled by
+accessory colors and the type-7 snowman is larger; tougher snowmen can also
+appear in the fog. Sound and the remaining planned steps are tracked in
+`PROGRESS.md`.
 
 ## Run it on desktop (Chrome)
 
@@ -18,8 +18,8 @@ cd ~/Documents/Code/GitHub/hello-quest-dev
 python3 -m http.server 8080
 ```
 
-Open `http://localhost:8080`. No VR headset needed to look around (desktop
-testing is mouse/keyboard only at this stage, no gameplay yet).
+Open `http://localhost:8080`. The game can be played with mouse/keyboard;
+the same scene also supports Quest controllers in VR.
 
 ## Run it on Meta Quest 2 (over USB)
 
@@ -37,9 +37,10 @@ for console errors and FPS.
 
 ## Tuning
 
-All tunable numbers (sizes, speeds, colors, timing) live in the `CONFIG`
-object near the top of `index.html`'s script block. All visible text (once
-the HUD exists) will live in the `I18N` object right after it.
+Tunable values live in `js/config.js`; visible text lives in `js/i18n.js`.
+The original type-1 snowman texture stays unchanged. Types 3, 5, and 7 use
+accessory recolors, with type 7 scaled to 1.5x; type-5/7 snowmen have a 60%
+chance of spawning in the outer fog band.
 
 ## Credits
 

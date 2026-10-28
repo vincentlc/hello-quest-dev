@@ -25,8 +25,9 @@ not current.
 **Current step: Step 6 (sound + haptics) — not started.** Steps 1-5bis and
 7 are done (desktop/Browser-pane verified; see the caveat below). Step 7
 was picked up out of order (user request); 6 and 8 are still open. Steps
-9-11 are newly planned, not started, and not blocking 6-8 — pick them up
-whenever, each as its own branch + PR per `CLAUDE.md`.
+9 and 11 remain open; step 10 is implemented, with in-browser and real
+headset visual verification still pending. These steps do not block 6-8 —
+pick them up whenever, each as its own branch + PR per `CLAUDE.md`.
 
 **Outstanding across every step since step 3:** none of this has been tried
 on a real Quest 2 headset yet — only desktop + the in-app Browser pane.
@@ -44,7 +45,7 @@ Keep that in mind before calling anything "done" in the VR-comfort sense.
 | 7 | HUD fix + welcome/credits screens + accent fallback | ✅ Done |
 | 8 | Performance pass + README/ASSETS.md + final docs grep | ⬜ Not started |
 | 9 | Desktop turn controls (rotate, not strafe, on Left/Right) | ⬜ Not started |
-| 10 | Per-difficulty snowman textures + bigger type-7 | ⬜ Not started |
+| 10 | Per-difficulty snowman textures + bigger type-7 + fog spawns | 🟡 Implemented; visual check pending |
 | 11 | Landscape progression after wave 5 / wave 10 | ⬜ Not started |
 | 12 | Lose condition: snowmen approach + touch the player | ⬜ Not started |
 | 13 | Scoring: accuracy bonus | ⬜ Not started |
@@ -1568,11 +1569,11 @@ Up/Down) still move forward/back as before; zero new console errors.
 <details>
 <summary><strong>Step 10 — per-difficulty snowman look + bigger type-7 (⬜ Not started)</strong></summary>
 
-**Scoped 2026-10-28, not yet implemented.** All snowmen currently share one
-base-color texture regardless of their `hitsToExplode` "type" (1/3/5/7,
-from step 4/5bis) — no visual cue for toughness before you start hitting
-one. Ask: distinct look per type, plus make the type-7 ("hardest") snowman
-1.5x bigger, same shape.
+**Completed 2026-10-28.** Snowmen now signal their `hitsToExplode` type
+(1/3/5/7) with accessory recolors; type 7 is 1.5x bigger while keeping the
+same model shape and grounded feet. Additionally, type-5/7 snowmen have a
+60% chance to spawn in the outer fog transition band for a distant,
+partially obscured silhouette.
 
 **Files:** `assets/models/copito/textures/` (new images); `index.html`'s
 `<a-assets>` block (new preloaded `<img>` entries); `js/config.js` (new
@@ -1600,7 +1601,7 @@ handful of extra small images in `<a-assets>`, same as any other asset.
 added *alongside* it; nothing about the current working look changes
 unless a snowman's type calls for an override.
 
-**Recoloring approach:** not a uniform full-texture tint — recolor
+**Implemented recoloring:** not a uniform full-texture tint — recolor
 specific accessory regions (hat band, scarf) instead, far more legible as
 a difficulty signal than washing the whole snowman one color, while
 keeping ~90% of the texture (the snow body itself) pixel-identical to the
@@ -1652,11 +1653,18 @@ height/radius scales per-target), sparkle vertical spread, and the
 explosion chunk height band. Not in scope: an actual different mesh for
 type 7 — "same shape... but bigger" stays a scale + texture change only.
 
-**Verification:** force each `hitsToExplode` value via the same direct
-`wave-director.startWave(n)` / `copito` activation technique already used
-in step 4/5bis testing, screenshot each type side-by-side to confirm the
-recolor reads clearly and the type-7 instance is ~1.5x bigger with feet
-grounded and hit detection working head-to-foot.
+Types 3/5/7 use preloaded PNGs derived from the unchanged original JPEG;
+type 3 recolors the scarf teal, type 5 recolors scarf and hat band blue,
+and type 7 uses a dark red scarf and dark blue hat band. Type 7's scale
+multiplier also sizes its model offset, hit pivot, shadow, sparkle spread,
+hit capsule, and explosion chunk height band. In the fog spawn band,
+type-5/7 snowmen are sampled from 6.1m to the existing 7m maximum (inside
+the scene's 4.5m-to-7.9m fog transition).
+
+**Verification:** texture variants were inspected at full resolution and
+the source image remains unchanged. Browser/headset verification of UV
+mapping, type-7 grounding, and the fog silhouette remains to be done;
+none of the gameplay since step 3 has yet been tried on a real Quest 2.
 
 </details>
 

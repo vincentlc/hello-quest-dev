@@ -95,7 +95,7 @@ AFRAME.registerComponent('wave-director', {
     }
     origin.y = 0;
 
-    var points = pickSpawnPoints(waveCfg.count, origin, forward);
+    var points = pickSpawnPoints(waveCfg.count, origin, forward, waveCfg.types);
 
     this.aliveThisWave = waveCfg.count;
     // Remembered for scheduleNextWave's time-bonus calc below --

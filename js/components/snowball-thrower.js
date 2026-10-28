@@ -279,8 +279,8 @@ AFRAME.registerComponent('snowball-thrower', {
       var dz = pos.z - this.scratchCopitoPos.z;
       var horizontalDist = Math.sqrt(dx * dx + dz * dz);
       var withinHeight = pos.y >= this.scratchCopitoPos.y &&
-        pos.y <= this.scratchCopitoPos.y + CONFIG.snowmanHeight + CONFIG.hitHeightMargin;
-      if (horizontalDist <= CONFIG.snowballHitRadius && withinHeight) return snowman;
+        pos.y <= this.scratchCopitoPos.y + (CONFIG.snowmanHeight + CONFIG.hitHeightMargin) * snowman.sizeScale;
+      if (horizontalDist <= CONFIG.snowballHitRadius * snowman.sizeScale && withinHeight) return snowman;
     }
     return null;
   }

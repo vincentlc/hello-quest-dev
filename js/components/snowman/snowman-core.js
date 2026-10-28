@@ -34,6 +34,9 @@ export default {
   init: function () {
     var el = this.el;
     this.hitsToExplode = this.data.hitsToExplode || CONFIG.hitsToExplode;
+    this.sizeScale = this.hitsToExplode === 7 ? CONFIG.bigSnowmanScaleMultiplier : 1;
+    this.modelScale = CONFIG.copitoScale * this.sizeScale;
+    this.hitPivotHeight = CONFIG.hitPivotHeight * this.sizeScale;
 
     // Unique per-instance id, used to namespace dynamically-created
     // <img> asset ids (blob shadow, crack textures) below -- with a
@@ -52,8 +55,8 @@ export default {
     var shadow = document.createElement('a-plane');
     shadow.setAttribute('rotation', '-90 0 0');
     shadow.setAttribute('position', '0 0.005 0');
-    shadow.setAttribute('width', '1.3');
-    shadow.setAttribute('height', '1.3');
+    shadow.setAttribute('width', 1.3 * this.sizeScale);
+    shadow.setAttribute('height', 1.3 * this.sizeScale);
     shadow.setAttribute('material', 'src: #' + shadowImg.id + '; transparent: true; shader: flat');
     el.appendChild(shadow);
     this.shadow = shadow; // referenced again in startExplosion/finishRespawn
@@ -64,7 +67,7 @@ export default {
     // directly under `el`, in the same plain el-local meters as
     // everything else positioned there.
     this.hitPivot = document.createElement('a-entity');
-    this.hitPivot.setAttribute('position', '0 ' + CONFIG.hitPivotHeight + ' 0');
+    this.hitPivot.setAttribute('position', '0 ' + this.hitPivotHeight + ' 0');
     el.appendChild(this.hitPivot);
 
     // The model's own export has a messy internal transform (Sketchfab's
@@ -76,21 +79,20 @@ export default {
     // squash/wobble) -- see hitPivotHeight's comment.
     this.model = document.createElement('a-entity');
     this.model.setAttribute('gltf-model', '#copitoModel');
-    this.model.setAttribute('scale', CONFIG.copitoScale + ' ' + CONFIG.copitoScale + ' ' + CONFIG.copitoScale);
-    var offset = CONFIG.copitoOffset.split(' ').map(Number);
-    this.model.setAttribute('position', offset[0] + ' ' + (offset[1] - CONFIG.hitPivotHeight) + ' ' + offset[2]);
+    this.model.setAttribute('scale', this.modelScale + ' ' + this.modelScale + ' ' + this.modelScale);
+    var offset = CONFIG.copitoOffset.split(' ').map((value) => Number(value) * this.sizeScale);
+    this.model.setAttribute('position', offset[0] + ' ' + (offset[1] - this.hitPivotHeight) + ' ' + offset[2]);
     this.hitPivot.appendChild(this.model);
 
     // Two base positions, different frames:
-    // - copitoOffsetVec: the original, unshifted el-local offset. Used
-    //   by worldToModelLocal to place the crack decals -- that mapping
-    //   is unaffected by hitPivot's existence (it nets out to the same
-    //   translation chain at rest), so it stays keyed to the original.
+    // - copitoOffsetVec: the scaled el-local offset. Used by
+    //   worldToModelLocal to place crack decals in the larger model's
+    //   local space.
     // - modelBasePosition: hitPivot-relative, used below for the idle
     //   bob/sway position-setting each tick (model's parent is now
     //   hitPivot, not `el`, so its base position must be too).
     this.copitoOffsetVec = { x: offset[0], y: offset[1], z: offset[2] };
-    this.modelBasePosition = { x: offset[0], y: offset[1] - CONFIG.hitPivotHeight, z: offset[2] };
+    this.modelBasePosition = { x: offset[0], y: offset[1] - this.hitPivotHeight, z: offset[2] };
 
     this.scratchCameraPos = new AFRAME.THREE.Vector3(); // see updateFacing
 
@@ -174,9 +176,9 @@ export default {
 
   worldToModelLocal: function (v) {
     return {
-      x: (v.x - this.copitoOffsetVec.x) / CONFIG.copitoScale,
-      y: (v.y - this.copitoOffsetVec.y) / CONFIG.copitoScale,
-      z: (v.z - this.copitoOffsetVec.z) / CONFIG.copitoScale
+      x: (v.x - this.copitoOffsetVec.x) / this.modelScale,
+      y: (v.y - this.copitoOffsetVec.y) / this.modelScale,
+      z: (v.z - this.copitoOffsetVec.z) / this.modelScale
     };
   },
 
