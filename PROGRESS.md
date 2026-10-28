@@ -750,13 +750,117 @@ than the round-2 version, which read as flatter. Root cause and fix:
 
 </details>
 
-**Step 5 — explosion + respawn: not started.** Chunks (40-60): use
-`THREE.InstancedMesh` (two instances — snow lumps, ice shards — already
-agreed during planning, for draw-call budget). Since there are no separate
-"parts" anymore, spawn chunks distributed across the model's overall
-bounding-box height bands instead of at specific part positions — visually
-equivalent. Comfort rule (bias away from player, nothing within 1m of head)
-still applies exactly as specified.
+**Step 5 — explosion + respawn: DONE.** Branched off
+`step-4-hit-reactions-and-packing` (not `main`) since the explosion logic
+needed step 4's hit-state machine to hook into; rebased onto `main` once
+step 4 merged (`#3`), so the branch history is linear.
+
+- **Hooks into step 4's existing event contract, no new one needed.**
+  `copito.onHit` already emitted `snowman-destroyed` on `#copito` once
+  `hitCount` reached `CONFIG.hitsToExplode` and then reset state
+  immediately — this step's `copito.startExplosion` listens for that same
+  event (on the same `el`, self-emit/self-listen, same pattern as
+  `snowball-hit`) and does the real thing instead. The `hitCount`/crack
+  reset moved from `onHit` to `finishRespawn` so Copito stays visibly
+  destroyed for the full `respawnDelay` instead of snapping back instantly.
+- **Built inside `copito` itself, not a separate `explosion-fx` component**
+  (deviation from the original spec's one-component-per-job layout). Step 4
+  had already established the pattern of one component owning build + idle
+  animation + hit state for this snowman; splitting explosion/respawn into
+  a separate component would mean constantly reaching back into `copito`'s
+  internals (`hitPivot`, `model`, `shadow`, `alive`) from outside, which is
+  worse than just extending the component that already owns all of it.
+  `copitoRegistry`'s per-instance design (step 4's multi-snowman
+  future-proofing) still works fine this way — nothing here assumes a
+  single global snowman.
+- **`alive` flag gates hit detection.** `snowball-thrower.findHitSnowman`
+  now skips any registered snowman with `alive === false`, so a snowball
+  can't score a hit on a hidden, mid-explosion/respawn body. Set false in
+  `startExplosion`, back to true in `finishRespawn`.
+- **Hiding Copito**: `hitPivot.object3D.visible = false` hides the model
+  *and* the crack decals in one call — `THREE.Object3D.visible = false`
+  stops the renderer from traversing into children too, and both live
+  inside `hitPivot`. The blob shadow and idle sparkles are siblings outside
+  that subtree (shadow directly under `el`, sparkles on `el.object3D`
+  itself), so they need their own explicit hide/show alongside it —
+  confirmed this the hard way by first forgetting the shadow in an early
+  pass, visible as a shadow sitting alone with nothing above it.
+- **Chunks**: two `THREE.InstancedMesh` pools (mint snow lumps =
+  `IcosahedronGeometry`, cyan ice shards = `OctahedronGeometry`), split
+  evenly across `CONFIG.chunkCount` (50), built once in `copito.init` and
+  reused every explosion (parked at scale 0 off-screen between uses, not
+  created/destroyed). Distributed across the model's height band
+  (`CONFIG.snowmanHeight`) from the snowman's own world position, not
+  per-part anchors — no separate "parts" on this fused mesh, same
+  constraint as steps 2/4. Each chunk Euler-integrates gravity, bounces
+  once at `y = 0` with damping (`CONFIG.chunkBounceDamping`), then shrinks
+  to 0 over `CONFIG.chunkFadeDuration` (1.5s) after the bounce — scaling to
+  nothing substitutes for a true per-instance alpha fade, which
+  `InstancedMesh`'s one shared material can't do without a custom shader;
+  reads the same at this chunk size.
+- **Comfort rule implemented structurally, not as a per-frame check.**
+  `copito.biasAwayFromCamera` mirrors any chunk direction that would point
+  toward the live camera position back away from it, at spawn time — so no
+  chunk's velocity ever has a toward-player component to begin with, rather
+  than clamping/checking distance every frame. Verified in-browser: after
+  an explosion, `max(chunk.velocity.z)` across all 50 chunks was negative
+  (away from the camera at the time), with the bias recomputed fresh from
+  the camera's actual position each explosion (not a fixed `+Z` assumption,
+  so it still holds if the player has moved). **Not yet verified on an
+  actual headset** — the structural guarantee hasn't been checked against
+  real head tracking, only a static desktop camera.
+- **Sparkle burst, light flash, haptics**: `buildExplosionBurst` is the
+  same reused-`THREE.Points`-buffer pattern as `buildSnowPuffs`, just
+  bigger (`CONFIG.explosionSparkleCount`, 250) and additive-blended. A
+  `THREE.PointLight` (`buildExplosionLight`) spikes to
+  `CONFIG.explosionFlashIntensity` for `CONFIG.explosionFlashDuration`
+  (150ms) and decays — no full-screen flash, per spec. Both hand
+  controllers get `CONFIG.haptics.explosion` (`[1.0, 150]`) via the same
+  guarded `pulseHaptics` helper throw/hit already used — hoisted it to a
+  module-level function (was a `snowball-thrower`-only method) once a
+  second caller needed the identical gamepad-lookup guard, rather than
+  duplicating it.
+- **Respawn**: `hitPivot` scale animates 0 → 1 with an overshoot "pop"
+  (`easeOutBack`, new module-level easing helper) over
+  `CONFIG.respawnPopDuration` (0.6s), safe to drive directly rather than as
+  a delta like bob/sway/squash since nothing else is competing for
+  `hitPivot`'s scale at that point (hit impulses have long since decayed).
+  `destroyedCount` increments on `finishRespawn` — no HUD to show it yet
+  (step 7's job), but the count isn't lost.
+- **`respawnDelay` lowered from the spec's 2.5s default to 1.5s** at
+  Vincent's request after a first look — felt slow. `respawnPopDuration`
+  left at 0.6s.
+- **Debugging note, logged so a future session doesn't re-chase this:** a
+  `THREE.BufferGeometry.computeBoundingSphere(): Computed radius is NaN`
+  console error appeared intermittently during this session's testing, but
+  **only** when test scripts manually stepped `copito.tick(fakeTime, 16)`
+  in a loop *interleaved* with the pane's own real automatic tick loop
+  (confirmed running continuously in this environment — budget the note
+  above about "`requestAnimationFrame` never fires on its own" from step
+  3's testing as no longer accurate here, or specific to a since-changed
+  pane behavior). Mixing a manually-incremented fake clock with the page's
+  real wall-clock ticks makes `time` non-monotonic across calls, and that's
+  what triggered it. Three separate clean runs using *only* the real tick
+  loop (trigger via `onHit`/an actual throw, then just let real time pass)
+  produced zero console errors through a full explosion → chunk-bounce →
+  fade → respawn-pop cycle. Same category as step 4's hot-swapped-config
+  false alarm: a test-harness artifact, not a bug in the shipped code — but
+  flagging it so it's recognized immediately if seen again rather than
+  re-investigated from scratch.
+- **Tested this session**: hit-3 → explosion trigger (state transitions
+  idle → exploding → respawning → idle, confirmed via direct state
+  inspection), `alive`/hit-detection gating during explosion
+  (`findHitSnowman` returns `null` for a snowman mid-explosion), all 50
+  chunks activate/bounce/fade/deactivate cleanly with zero leaked NaN in
+  the instance matrices, burst + light flash fire and decay to off, both
+  haptics calls guarded correctly with no controller present, respawn pop
+  completes and hit detection resumes normally on the next hit
+  (`hitCount` correctly reset, crack decals correctly hidden), comfort-rule
+  bias confirmed structurally (see above). Screenshots confirm idle,
+  mid-explosion, and mid-respawn-pop frames all render as expected with the
+  surrounding scene (sky/ground/fog) unaffected. **Not yet tested on an
+  actual Quest 2 headset** — same outstanding item as every step since
+  step 3, plus the comfort-rule caveat above.
 
 **Step 6 — sound + haptics: not started.** Same access problem as the sky
 image is likely for Kenney/Freesound — Vincent will probably need to
