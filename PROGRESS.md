@@ -90,6 +90,26 @@ the step-by-step status.
   (`~/Documents/Claude_folder/Meta_quest_coaniquem/`) still holds the work
   order and the bigger-picture docs (`01_context/`, `02_plans/`, etc.) but no
   longer has a copy of this project's files.
+- **The code is modularized (refactor, not a new step): `index.html` is
+  now a thin shell** (scene markup only) loading `css/main.css` and
+  `js/main.js` (`<script type="module">`) — the ~1700-line inline
+  `<script>` that used to hold everything (CONFIG, I18N, every
+  component) was split by responsibility into `js/config.js`,
+  `js/i18n.js`, `js/core/` (generic helpers: math, haptics, textures,
+  desktop aim, spawn placement), `js/data/` (tunable tables: crack
+  slots, the wave table), `js/registry/` (the multi-snowman registry),
+  and `js/components/` (one file per A-Frame component; the `copito`
+  component itself is assembled in `js/components/snowman/` from five
+  files — core/lifecycle, idle sparkles, hit reactions, cracks,
+  explosion+respawn — merged with `Object.assign` in
+  `snowman-component.js`). No logic changed in the move, only where it
+  lives; verified behavior-identical in-browser (module load, a real
+  hit → explosion → wave-director scoring → next wave spawning, zero
+  console errors) before merging. Python's `http.server` serves ES
+  modules fine, no build step needed — same `.claude/launch.json`
+  dev-server setup as before. If adding a new component or data table,
+  follow this layout rather than growing `index.html` or `main.js`
+  again.
 - **The repo has a remote**: `origin` →
   `https://github.com/vincentlc/hello-quest-dev.git`. Nothing has been
   pushed as part of this move — only committed locally. Don't push without
