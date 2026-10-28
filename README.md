@@ -18,8 +18,8 @@ cd ~/Documents/Code/GitHub/hello-quest-dev
 python3 -m http.server 8080
 ```
 
-Open `http://localhost:8080`. No VR headset needed to look around (desktop
-testing is mouse/keyboard only at this stage, no gameplay yet).
+Open `http://localhost:8080`. On desktop, move the mouse to look around,
+use W/S or Up/Down to move forward/back, and use Left/Right or A/D to turn.
 
 ## Run it on Meta Quest 2 (over USB)
 

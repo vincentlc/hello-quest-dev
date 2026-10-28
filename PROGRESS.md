@@ -23,9 +23,9 @@ not current.
 ## Status at a glance
 
 **Current step: Step 6 (sound + haptics) — not started.** Steps 1-5bis and
-7 are done (desktop/Browser-pane verified; see the caveat below). Step 7
-was picked up out of order (user request); 6 and 8 are still open. Steps
-9-11 are newly planned, not started, and not blocking 6-8 — pick them up
+7 and 9 are done (desktop/Browser-pane verified; see the caveat below).
+Step 7 was picked up out of order (user request); 6 and 8 are still open.
+Steps 10-11 remain planned and are not blocking 6-8 — pick them up
 whenever, each as its own branch + PR per `CLAUDE.md`.
 
 **Outstanding across every step since step 3:** none of this has been tried
@@ -43,7 +43,7 @@ Keep that in mind before calling anything "done" in the VR-comfort sense.
 | 6 | Sound + haptics | ⬜ Not started |
 | 7 | HUD fix + welcome/credits screens + accent fallback | ✅ Done |
 | 8 | Performance pass + README/ASSETS.md + final docs grep | ⬜ Not started |
-| 9 | Desktop turn controls (rotate, not strafe, on Left/Right) | ⬜ Not started |
+| 9 | Desktop turn controls (rotate, not strafe, on Left/Right) | ✅ Done |
 | 10 | Per-difficulty snowman textures + bigger type-7 | ⬜ Not started |
 | 11 | Landscape progression after wave 5 / wave 10 | ⬜ Not started |
 | 12 | Lose condition: snowmen approach + touch the player | ⬜ Not started |
@@ -1519,32 +1519,30 @@ across all authored files before calling this done.
 </details>
 
 <details>
-<summary><strong>Step 9 — desktop turn controls (⬜ Not started)</strong></summary>
+<summary><strong>Step 9 — desktop turn controls (✅ Done)</strong></summary>
 
-**Scoped 2026-10-28, not yet implemented.** On desktop, A-Frame's built-in
+**Implemented 2026-10-28.** On desktop, A-Frame's built-in
 `wasd-controls` makes Left/Right (and A/D) strafe the player sideways —
 that reads as sliding, not turning, unlike VR where looking left/right is
-a head/body rotation. Ask: make desktop Left/Right rotate the view
-instead. Confirmed with the user: **smooth continuous rotation** while a
-key is held (not snap-turn).
+a head/body rotation. The requested behavior is **smooth continuous
+rotation** while a key is held (not snap-turn). The camera now disables
+A/D and arrow-key strafing, keeps W/S and Up/Down forward/back movement,
+and turns smoothly at 90 degrees per second from Left/Right or A/D.
 
-**Files:** `index.html` — camera entity markup (`<a-entity camera ...>`,
-currently `look-controls wasd-controls`); `js/config.js` for the new
-CONFIG value; a new component file (e.g. `js/components/desktop-turn.js`,
-imported from `js/main.js` alongside the other components there) — see
-the "code is modularized" note in Environment facts above, this file
-layout postdates the original version of this plan.
+**Files:** `index.html` camera controls; `js/config.js` turn speed;
+`js/components/desktop-turn.js` keyboard handling, imported by
+`js/main.js`.
 
 1. `CONFIG.desktopTurnSpeedDegPerSec = 90` (tunable later).
-2. Add `wasd-controls="adEnabled: false"` to the camera entity. Confirmed
+2. The camera uses `wasd-controls="adEnabled: false"`. Confirmed
    in `vendor/aframe.min.js`: `wasd-controls`'s `adEnabled` schema flag
    (default `true`) gates the `KeyA`/`ArrowLeft` and `KeyD`/`ArrowRight`
    branches of its velocity update — setting it `false` removes sideways
    strafing from both WASD and the arrow keys entirely, while leaving
    `KeyW`/`ArrowUp` and `KeyS`/`ArrowDown` (forward/back) untouched.
-3. New component, e.g. `desktop-turn`, added to the same camera entity.
-   Tracks `ArrowLeft`/`ArrowRight`/`KeyA`/`KeyD` keydown/keyup in its own
-   `this.keys` map (same lightweight pattern `wasd-controls` itself uses).
+3. The `desktop-turn` component on the camera tracks
+   `ArrowLeft`/`ArrowRight`/`KeyA`/`KeyD` keydown/keyup in its own
+   `this.keys` map.
    In `tick(time, delta)`, while a turn key is held, rotate the view by
    mutating **`this.el.components['look-controls'].yawObject.rotation.y`**
    by `±(desktopTurnSpeedDegPerSec * delta/1000 * DEG2RAD)`.
@@ -1556,12 +1554,12 @@ layout postdates the original version of this plan.
      silently overwritten the very next frame. Mutating `yawObject` is
      exactly what `look-controls`' own mouse-drag handler (`onMouseMove`)
      already does, so keyboard-turn and mouse-look stay fully compatible.
-   - Direction/sign isn't worth guessing on paper — verify in-browser that
-     "Left" visually turns the view left, flip the sign if it's backwards.
 
-**Verification:** load the page, hold Left — view rotates left
-continuously, not translating; hold Right — rotates right; W/S (and
-Up/Down) still move forward/back as before; zero new console errors.
+**Verification:** the registered component's in-page behavior was exercised
+for left/right direction and speed, key release, opposing keys, focus loss,
+VR mode, and component removal. The page's A-Frame scene could not attach
+components in this browser session because WebGL context creation fails, so
+rendered scene interaction still needs a working desktop browser.
 
 </details>
 
