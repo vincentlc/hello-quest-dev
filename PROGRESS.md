@@ -1042,6 +1042,40 @@ turned out small enough to land in one pass once started.
   so it's a different -- and so far unconfirmed -- question whether it was
   ever actually at risk the same way).
 
+**Step 5 bis follow-up round (same session, after the user's first look):**
+three requests, all folded into the same branch:
+
+1. **Harder ramp + 2 more rows.** `WAVE_TABLE` went from 10 to 12 rows and
+   the early pacing was tightened: wave 1 is still a single type-1 snowman
+   (kept as a quick, readable intro), but wave 2 now brings a second
+   snowman immediately (previously another single one) and type-3 shows up
+   by wave 3 instead of wave 4. Every later row shifted correspondingly
+   tougher. `CONFIG.waveMaxConcurrentSnowmen` (8) and the spawn-placement
+   band were already generous enough to not need changing for the new
+   7-snowman top row.
+2. **Snowmen now always face the camera**, not just at spawn. New
+   `copito.updateFacing()`, called every tick (all explosion states,
+   cheap): yaw-only, applied to `el` itself (never the model
+   wrapper/hitPivot, which stay free for idle sway/hit wobble) via
+   `atan2(dx, dz)` toward the camera's live world position. Relies on the
+   model's unrotated rest pose already facing local +Z -- confirmed
+   visually from the original single-snowman placement, which had no
+   rotation attribute and always faced the camera dead-on when spawned
+   directly ahead. This was a real gap the old fixed single-spawn-point
+   setup never exposed: once wave-director scattered snowmen across a wide
+   arc, anything off-angle would otherwise show its side/back by default.
+   Verified in-browser across a 6-snowman wave (type mix `[3,5,5,7,7,7]`,
+   wide arc) -- every spawn point reads front-on in the screenshot.
+3. **How to show wave/score in VR, asked but not yet built:** recommended
+   a world-space HUD anchored to the camera entity (plain A-Frame
+   `<a-text>`/plane, fixed local offset so it follows head movement) since
+   a 2D page overlay (like the existing `#credit` div) isn't visible inside
+   the headset -- this is exactly what step 7 ("HUD + i18n") below already
+   covers, including the VR-comfort caveat (don't lock it dead-center;
+   peripheral placement avoids the head-locked-UI nausea issue). Not
+   implemented this round -- the user was asking for an approach, not
+   requesting the build yet.
+
 **Step 6 — sound + haptics: not started.** Same access problem as the sky
 image is likely for Kenney/Freesound — the user will probably need to
 download the Kenney Impact Sounds zip and the Freesound wind clip themselves
