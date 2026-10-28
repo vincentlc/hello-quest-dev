@@ -1486,6 +1486,21 @@ progress como otra etapa").
   shows (not the record line) on a second `show()` call with a lower
   score; zero console errors throughout.
 
+**Step 7 follow-up round 3 (same session, small copy tweak):** welcome
+title changed from "¡Bienvenido!" to "Te damos la bienvenida" -- the user
+asked for gender-neutral phrasing (Spanish "bienvenido"/"bienvenida" is
+gender-inflected; "te damos la bienvenida" sidesteps that entirely, no
+-o/-a agreement needed). The subtitle no longer starts with "Bienvenido
+a..." for the same reason (and to not say it twice) -- it's pure
+tagline/branding now ("Snoworld Copito: el juego que desafía a los monos
+de nieve"), and its font size was bumped (34 -> 46) per the user's ask
+("un poco más grande"). English `welcomeTitle` ("Welcome!") was left as-is
+-- English doesn't have this gendered-adjective issue, so there was
+nothing to fix there. **Tested this session:** fresh-tab console clean;
+both lines render correctly at the new size with no clipping (title wraps
+to 2 lines, same as before); end-screen re-confirmed unaffected (it never
+used the subtitle region).
+
 </details>
 
 <details>

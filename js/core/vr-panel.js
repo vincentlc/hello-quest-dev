@@ -56,7 +56,7 @@ export function buildPanel(parentEl, opts) {
   // welcome-screen uses it today (the "Snoworld Copito" tagline under
   // the title), end-screen doesn't pass it and gets no subtitle plane
   // or extra height for one.
-  var subtitleFontSize = opts.subtitleFontSize || 34;
+  var subtitleFontSize = opts.subtitleFontSize || 46;
   var subtitleMaxLines = opts.subtitleMaxLines || 0;
   var subtitleCanvasHeight = subtitleMaxLines > 0
     ? Math.round(subtitleFontSize * 1.3 * subtitleMaxLines + subtitleFontSize * 0.5) : 0;

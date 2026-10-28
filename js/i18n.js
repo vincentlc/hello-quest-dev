@@ -11,8 +11,13 @@ export var I18N = {
     destroyed: 'Muñecos destruidos',
     wave: 'Oleada',
     score: 'Puntos',
-    welcomeTitle: '¡Bienvenido!',
-    welcomeSubtitle: 'Bienvenido a Snoworld Copito: el juego que desafía a los monos de nieve',
+    // "Te damos la bienvenida" instead of "¡Bienvenido!" -- gender-neutral
+    // phrasing (no -o/-a ending to agree with the player's gender), per
+    // the user's request. Subtitle no longer repeats "bienvenido" for the
+    // same reason (and to avoid saying it twice) -- the title already
+    // covers the welcome, the subtitle is pure tagline/branding now.
+    welcomeTitle: 'Te damos la bienvenida',
+    welcomeSubtitle: 'Snoworld Copito: el juego que desafía a los monos de nieve',
     gameComplete: '¡Juego completado!',
     finalScore: 'Puntuación final',
     bestScore: 'Mejor puntaje',
@@ -28,7 +33,7 @@ export var I18N = {
     wave: 'Wave',
     score: 'Score',
     welcomeTitle: 'Welcome!',
-    welcomeSubtitle: 'Welcome to Snoworld Copito: the game that takes on the snowmen',
+    welcomeSubtitle: 'Snoworld Copito: the game that takes on the snowmen',
     gameComplete: 'Game complete!',
     finalScore: 'Final score',
     bestScore: 'Best score',
