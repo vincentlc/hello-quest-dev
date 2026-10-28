@@ -191,6 +191,34 @@ export var CONFIG = {
   waveSoftTimerBonusMax: 30,
   waveSoftTimerDecayPerSecond: 1,
 
+  // End-of-run credits screen (step 7). Modular on purpose: once
+  // (waveIndex + 1) reaches this number, wave-director stops scheduling
+  // further waves and emits 'game-complete' instead -- end-screen.js
+  // freezes the game and shows a one-shot in-VR panel (score + credits)
+  // until a 'snowball-thrown' event (any throw, see snowball-thrower's
+  // spawn()) tells it to restart from wave 1. Raise this later for a
+  // longer run without touching any other code.
+  creditsAfterWave: 10,
+  // World-space placement/size for that panel -- spawned once in front
+  // of wherever the player is looking at the moment the game completes
+  // (not head-locked, see end-screen.js), so it reads like a sign
+  // placed in the world rather than UI glued to your eyes.
+  creditsPanelDistance: 2.2,
+  creditsPanelWidth: 1.7,
+  creditsPanelHeight: 1.05,
+  creditsParticleCount: 90,
+
+  // Welcome/intro panel (step 7, new): shown once right after load,
+  // explaining the throw control (desktop click vs the VR trigger,
+  // picked live off vr-mode) with a small controller icon highlighting
+  // the trigger -- see welcome-screen.js/controller-icon.js. Dismissed
+  // by the player's own first throw, or this timeout if they never
+  // throw, so it never lingers forever.
+  welcomePanelDistance: 1.8,
+  welcomePanelWidth: 1.3,
+  welcomePanelHeight: 0.85,
+  welcomeAutoHideSeconds: 14,
+
   // Sound volumes 0 to 1 (step 6)
   volume: {
     throw: 0.5,

@@ -38,6 +38,10 @@ AFRAME.registerComponent('wave-director', {
 
     this.el.addEventListener('snowman-destroyed', (evt) => this.onSnowmanDestroyed(evt));
     this.el.addEventListener('snowman-cleared', (evt) => this.onSnowmanCleared(evt));
+    // end-screen.js re-emits this once a snowball is thrown while the
+    // post-credits freeze is active (see scheduleNextWave below) --
+    // restart is just "start over at wave 1 with the score reset".
+    this.el.addEventListener('restart-game', () => this.restart());
 
     // Deferred a macrotask past init (not called directly here):
     // startWave appends new DOM entities (the pool, see
@@ -143,7 +147,23 @@ AFRAME.registerComponent('wave-director', {
     this.score += CONFIG.waveClearBonus + softBonus;
     console.log('[wave-director] wave ' + (this.waveIndex + 1) + ' cleared, score ' + Math.round(this.score));
     this.emitState();
+
+    // Step 7: once the configured run length is cleared, freeze instead
+    // of letting getWaveConfig keep generating waves forever -- hand off
+    // to end-screen.js (listens for this same event on this.el) to show
+    // the in-VR credits panel. Nothing here assumes end-screen.js is
+    // actually present/listening, so this still degrades safely (game
+    // just stops spawning) if that component is ever removed.
     var nextIndex = this.waveIndex + 1;
+    if (nextIndex >= CONFIG.creditsAfterWave) {
+      this.el.emit('game-complete', { score: this.score });
+      return;
+    }
     setTimeout(() => this.startWave(nextIndex), CONFIG.waveIntermissionDelay * 1000);
+  },
+
+  restart: function () {
+    this.score = 0;
+    this.startWave(0);
   }
 });

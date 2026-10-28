@@ -22,10 +22,11 @@ not current.
 
 ## Status at a glance
 
-**Current step: Step 6 (sound + haptics) — not started.** Steps 1-5bis are
-done (desktop/Browser-pane verified; see the caveat below). Steps 9-11 are
-newly planned, not started, and not blocking 6-8 — pick them up whenever,
-each as its own branch + PR per `CLAUDE.md`.
+**Current step: Step 6 (sound + haptics) — not started.** Steps 1-5bis and
+7 are done (desktop/Browser-pane verified; see the caveat below). Step 7
+was picked up out of order (user request); 6 and 8 are still open. Steps
+9-11 are newly planned, not started, and not blocking 6-8 — pick them up
+whenever, each as its own branch + PR per `CLAUDE.md`.
 
 **Outstanding across every step since step 3:** none of this has been tried
 on a real Quest 2 headset yet — only desktop + the in-app Browser pane.
@@ -40,7 +41,7 @@ Keep that in mind before calling anything "done" in the VR-comfort sense.
 | 5 | Explosion + respawn | ✅ Done |
 | 5 bis | Wave/level director (multi-snowman waves, HUD) | ✅ Done |
 | 6 | Sound + haptics | ⬜ Not started |
-| 7 | HUD + i18n + accent check + in-VR credit line | ⬜ Not started |
+| 7 | HUD fix + welcome/credits screens + accent fallback | ✅ Done |
 | 8 | Performance pass + README/ASSETS.md + final docs grep | ⬜ Not started |
 | 9 | Desktop turn controls (rotate, not strafe, on Left/Right) | ⬜ Not started |
 | 10 | Per-difficulty snowman textures + bigger type-7 | ⬜ Not started |
@@ -185,9 +186,10 @@ the step-by-step status.
    The user provided it (Sketchfab "Snowman" by alixor22). This is now the
    *one* non-CC0 asset — see `ASSETS.md` for the required credit text, which
    is already shown in two places: `ASSETS.md` and a small on-page corner
-   div in `index.html` (`#credit`). **Still owed:** an in-scene credit line
-   visible inside the headset itself (the on-page div isn't visible once in
-   VR) — planned for step 7 (HUD), don't forget it.
+   div in `index.html` (`#credit`). **Done as of step 7:** an in-scene
+   credit line visible inside the headset itself, shown on the end-of-run
+   `end-screen` panel (see step 7's notes) rather than continuously on
+   every snowman, per the user's explicit preference.
    - The model is a **single fused mesh** (Sketchfab's export merges
      everything) — no separate "eye", "crown", "head" sub-parts to animate
      individually. This changes how steps 2 and 4 need to work; see their
@@ -1230,14 +1232,168 @@ loopable. `CONFIG.volume` and `CONFIG.haptics` are already defined.
 </details>
 
 <details>
-<summary><strong>Step 7 — HUD + i18n + accent check (⬜ Not started)</strong></summary>
+<summary><strong>Step 7 — HUD fix + welcome/credits screens + accent fallback (✅ Done)</strong></summary>
 
-**Step 7 — HUD + i18n + accent check: not started.** Also: **add the in-VR
-CC-BY credit line here** (owed from step 1/model swap, see deviation #1
-above). `I18N` object already has the core strings; test á/é/ñ/¡ rendering
-in A-Frame's default MSDF font early in this step — fall back to a
-canvas-texture text plane if glyphs are missing (spec's own documented
-fallback).
+**Step 7: DONE.** Branched as `step-7-hud-i18n-credits`. Scope grew during
+the session past the original "HUD + i18n + accent check" brief, driven by
+user requests made at the start of the step (see below) — all folded into
+this one branch/PR rather than split further, since they're all small and
+touch the same new files.
+
+**What was asked for, going in:**
+1. Don't credit the CC-BY model on every snowman — instead, show an
+   end-of-run screen (after a modular wave count, default 10) crediting the
+   user ("Created by Vincentlc") and the CC-BY model, in-VR.
+2. The existing minimal `wave-hud` (step 5 bis) was reported as "buggy on
+   the Meta Quest — can see it in a corner... but not currently visible."
+3. (Added mid-session) A welcome/intro screen explaining the throw control
+   (trigger in VR, click on desktop) with a small controller-icon visual,
+   since nothing currently tells a new player what to do.
+
+**1. `wave-hud` fix.** Root cause: its position (`0.55 -0.35 -1.2`) put it
+about 25 degrees off-axis from center — past the zone each lens on a Quest
+2 renders crisply, so on-device it likely showed up jammed into the extreme
+corner of the visible image instead of reading as a corner HUD. Pulled in
+to `0.3 -0.22 -1.1` (~15-19 degrees off-axis, still clearly peripheral) and
+given a dark translucent backing card (now baked directly into its canvas
+texture, see the font/accent section below) for contrast against a bright
+sky/snow background. **Still not verified on a real headset** — the
+*reasoning* (lens sweet-spot geometry) is solid and matches the reported
+symptom, but the actual on-device feel is the real test, same as every
+other VR-comfort item in this project.
+
+**2. End-of-run credits screen.** New `CONFIG.creditsAfterWave = 10`
+(modular, per the ask — raise it for a longer run without touching other
+code). `wave-director.scheduleNextWave` now checks
+`(waveIndex + 1) >= CONFIG.creditsAfterWave` before scheduling the next
+wave; if reached, it emits `game-complete` (with the final score) instead
+and stops. New `end-screen` component (on `<a-scene>`) listens for that and
+shows a one-shot **world-space** panel — placed once, in front of wherever
+the player is looking at that moment (not head-locked like `wave-hud`), so
+it reads like a sign placed in the world rather than UI glued to the
+camera (avoids the "pasted to your eyeballs" discomfort a continuously
+head-locked full panel would cause). Shows final score, "Creado por
+Vincentlc" / "Created by Vincentlc", the CC-BY model credit (`MODEL_CREDIT`
+in `i18n.js`, shared/untranslated since it's a name/license string), and a
+restart hint — plus a brief snow-particle flourish (same one-shared-
+`THREE.Points`-pool pattern as `copito`'s snow-puff burst). **Restart, per
+the user's explicit ask ("freeze, but throw snow to restart, with message
+displayed to do it"):** `snowball-thrower.spawn()` now emits
+`snowball-thrown` on the scene on every throw; `end-screen` listens for
+that while its panel is active and emits `restart-game`, which
+`wave-director` picks up to reset score to 0 and restart at wave 1 — not an
+aimed hit on the panel itself, since requiring precise aim right after
+reading an end screen isn't the point.
+
+**3. Welcome/intro screen.** New `welcome-screen` component, same
+one-shot-world-space-panel pattern (factored into shared `vr-panel.js`, see
+below) — shows right after load, reusing the already-defined-but-previously
+-unused `I18N.instructionVR`/`instructionDesktop` strings (swapped live on
+`enter-vr`/`exit-vr`, since entering VR needs its own user gesture so
+vr-mode is usually still false the instant this first shows), plus a small
+canvas-drawn controller icon (`core/controller-icon.js`: tracking ring +
+handle silhouette + a highlighted/glowing trigger area + a curved "squeeze"
+arrow) since the user specifically asked for a mini visual of the control,
+not just text. Dismissed by the player's own first throw (same
+`snowball-thrown` event end-screen uses) — a natural "do the thing to
+continue" affordance — or after `CONFIG.welcomeAutoHideSeconds` (14s) if
+they never throw, so it never lingers forever.
+
+**Shared panel builder: `core/vr-panel.js`.** Once a second screen needed
+the exact same framed-card construction (teal border + dark backdrop +
+title/body text) as the first, pulled the builder out rather than
+duplicating it — `buildPanel(parentEl, opts)` returns `{panel, setTitle,
+setBody}`, and `placeFacingCamera(panelEl, camera, distance, yOffset)` is
+the shared one-shot "place this in front of the player and yaw it to face
+back" math both screens use (same `atan2(dx, dz)` convention
+`copito.updateFacing()` already established).
+
+**Accent/font fallback — the step's original "accent check" scope, and a
+real bug found doing it.** Checked á/é/ñ/¡ rendering in A-Frame's bundled
+MSDF font early, per the original plan note, by reading the font's own
+loaded glyph list live in-browser (`textComponent.currentFont.chars`):
+**confirmed zero accented/special glyphs at all** — á, é, í, ó, ú, ñ, ¡, ¿
+are all simply absent from `fonts/roboto`, not just visually off. Since
+this project's default language (`LANG = 'es'`) depends on exactly those
+characters throughout, A-Frame's `text` component isn't usable for *any*
+visible in-VR text here, not just the new strings — implemented the
+spec's own documented fallback (canvas-texture text plane) and applied it
+project-wide to every piece of in-VR text added or touched this step
+(`wave-hud`, `welcome-screen`, `end-screen`), via a new shared
+`core/canvas-text.js` (`createTextPlane`): draws with the real system font
+stack via `ctx.fillText` (full Unicode coverage) onto a canvas, applied as
+a texture on a plane mesh instead of `<a-entity text>`. Also does its own
+word-wrap at word boundaries for any line too wide for its canvas (found
+needed when testing the Spanish VR instruction sentence, which rendered at
+1001 of a 1024px canvas at the chosen font size — technically fit but with
+only ~11px of margin, too fragile against any font-metric difference on a
+real device/headset) while still honoring explicit `\n`s as hard breaks
+(used for blank-line spacing between the end screen's score/credit/restart
+blocks). **Not retrofitted onto every older piece of text in the file**
+(e.g. nothing in steps 1-6 used accented characters in a way that was
+user-reported as broken) — scoped to what this step actually touches/adds;
+a future session doing more i18n work should reuse `canvas-text.js` rather
+than `<a-entity text>` for anything in Spanish.
+
+**A second real bug found verifying the above, not just a font gap:**
+building `end-screen`/`welcome-screen`'s title+body as separate canvas-text
+meshes next to a separate backdrop/border `<a-plane>` (both children of one
+wrapper entity) initially rendered as a **blank card — text pixels were
+correctly drawn into their own canvases (confirmed via `getImageData`,
+non-zero alpha in the right regions) but never visible on screen.** Root
+cause, confirmed by inspecting the live THREE materials: A-Frame's
+`material` component leaves `depthWrite` at three.js's default (`true`)
+even on a semi-transparent plane (`opacity: 0.88`); the backdrop happened
+to end up drawn *after* the text meshes in the same `renderOrder` tier
+(draw order fell out of DOM/entity-attach timing — the raw text meshes were
+added to the group synchronously via `object3D.add()`, while the `a-plane`
+backdrop/border's own object3D attaches asynchronously, slightly later) —
+so the backdrop's near-opaque fill painted over the already-drawn text.
+Fixed with an explicit `renderOrder = 1` on every text/icon mesh that sits
+over a panel backdrop (backdrop/border stay at the default 0), forcing
+correct draw order regardless of attach timing — a standard three.js
+technique for exactly this "UI text over a UI backdrop" situation. Logged
+here in detail since this exact category (a semi-transparent A-Frame
+`material`-component plane with implicit `depthWrite: true` occluding a
+raw three.js object added alongside it) is likely to recur if more custom
+three.js content gets layered onto `a-plane`/`a-circle` backgrounds later
+in this project.
+
+**New config:** `creditsAfterWave`, `creditsPanelDistance/Width/Height`,
+`creditsParticleCount`, `welcomePanelDistance/Width/Height`,
+`welcomeAutoHideSeconds` — all in `js/config.js`. **New i18n keys:**
+`welcomeTitle`, `gameComplete`, `finalScore`, `createdBy`, `restartHint`
+(es/en) plus the shared `MODEL_CREDIT` constant, all in `js/i18n.js`. **New
+files:** `js/core/canvas-text.js`, `js/core/vr-panel.js`,
+`js/core/controller-icon.js`, `js/components/end-screen.js`,
+`js/components/welcome-screen.js`. **New event:** `snowball-thrown`
+(emitted by `snowball-thrower.spawn()` on every throw — used by both new
+screens' dismiss/restart triggers; harmless no-op for anything else that
+might listen later). **New entities on `<a-scene>`:** `end-screen
+welcome-screen` (alongside the existing `snowball-thrower wave-director`).
+
+**Tested this session** (Browser pane, same single-frame-render-on-demand
+constraint as every prior step — each screenshot forces one render):
+fresh-tab console clean across every reload; `welcome-screen` shows
+"¡Bienvenido!" + the (correctly accented) instruction text + the controller
+icon on load, dismisses cleanly on the first desktop click-throw, and
+visually auto-hides after `welcomeAutoHideSeconds` (confirmed this fired
+due to real elapsed wall-clock time across slow tool round-trips during
+testing, not a bug); `wave-director` scripted directly to the
+`creditsAfterWave` boundary (`waveIndex = 9` → `scheduleNextWave()`)
+correctly emits `game-complete` and *not* a wave 11; `end-screen` then
+shows "¡Juego completado!" / "Puntuación final: 1314" (both accented
+glyphs correct) / "Creado por Vincentlc" / the CC-BY model credit line /
+the restart hint, with the particle flourish firing; a throw afterward
+fires `restart-game`, confirmed `wave-director.waveIndex === 0` and
+`score === 0` immediately after, panel hidden, wave 1 restarted cleanly.
+Word-wrap verified directly (the long VR instruction sentence wraps to 2
+lines, both well inside the safe width, instead of nearly clipping at the
+canvas edge as it did before that fix). **Not yet tested: an actual Quest 2
+headset** — same outstanding item as every step since step 3, and
+*especially* relevant here since this step's whole premise (point 1) was a
+bug report made from real on-device use; the fix is reasoned from lens/FOV
+geometry, not re-confirmed on the hardware that reported it.
 
 
 </details>
