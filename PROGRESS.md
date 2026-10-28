@@ -383,8 +383,358 @@ note below for how the two steps meet.
 
 </details>
 
-**Step 4 — 3-hit reactions: not started. Prepared brief (adapted for the
-single-mesh model):**
+**Step 4 — 3-hit reactions + snowball packing/stacking: DONE.**
+
+- **Hit reactions**, all driven by the `snowball-hit` event `snowball-thrower`
+  already emits (step 3's contract): `copito` tracks `hitCount` and listens
+  for it.
+  - Hit 1: whole-model squash-stretch (decaying damped-oscillation impulse,
+    see `computeImpulse`, applied as a delta on top of `copitoScale` the same
+    way idle bob/sway are deltas on top of `copitoOffset` — hit reactions and
+    idle animation never fight over the transform) + a brief material
+    color-flash (materials collected once via the model's `model-loaded`
+    event, traversed and cached with their original colors so the flash can
+    revert exactly) + a snow-puff particle burst at the impact point (one
+    shared `THREE.Points` pool, `CONFIG.snowPuffCount` particles, reused
+    every hit rather than allocated per hit).
+  - Hit 2: bigger squash (`CONFIG.hitSquashAmplitude[1]`) + an added wobble
+    rotation (`CONFIG.hitWobbleAmplitude`, same decaying-impulse mechanism,
+    on `rotation.z`/`rotation.x`) + a crack decal: a canvas-drawn crack
+    texture on a plane, built once at init and just toggled visible/hidden
+    rather than created per hit. **Simplification from the original
+    brief:** the wobble rotates the model wrapper around its own base
+    origin (feet), not a pivot at head height — the model's corrective
+    offset (`copitoOffset`) already puts that origin near the ground, and a
+    true head-height pivot would need extra pivot-point math for a fused
+    mesh with no separable parts. Reads fine as "shaken" in testing; revisit
+    only if Vincent flags it as too subtle/wrong-feeling in VR.
+  - Hit 3: per the event contract, emits `snowman-destroyed` on `#copito`
+    (step 5's hook) and, since step 5's explosion/respawn isn't built yet,
+    resets `hitCount` to 0 and hides the crack decal immediately rather than
+    leaving Copito stuck mid-damage with no recovery. Swap this reset for
+    the real explosion when step 5 lands.
+  - Crack sound: **deferred to step 6** (no audio assets wired up yet, same
+    as the rest of sound/haptics).
+- **Snowball packing/stacking (new, requested alongside step 4, not in the
+  original spec):** a miss that reaches the ground no longer vanishes after
+  `snowballLifetime` — `snowball-thrower.tick()` now checks
+  `pos.y <= CONFIG.snowballRadius` for any flying snowball and, if hit,
+  calls `land()` instead of `deactivate()`. A landed snowball eases into a
+  squashed "packed into the snow" shape over `CONFIG.landedSquashTime`
+  (scale eased toward `CONFIG.landedSquashXZ`/`landedSquashY`) and just sits
+  there, visible, no longer simulated.
+  - **The limit** is `CONFIG.maxLandedSnowballs` (8): landed slots are
+    tracked in a small FIFO (`this.landed`). Once a new landing would exceed
+    the cap, the oldest landed snowball is freed back to the pool
+    immediately — no extra cleanup pass needed.
+  - **Pool reuse was the one subtlety:** the existing throw pool already
+    reuses slots round-robin (`spawn()`); a landed snowball just occupies its
+    slot until that same round-robin comes back around to it, at which point
+    it's thrown again like any other slot. `spawn()` only needed one new
+    line (drop the slot from the `landed` FIFO if it was currently landed)
+    for this to work correctly — confirmed by scripted testing (see below)
+    that round-robin naturally evicts the oldest landed ball once 11 misses
+    are thrown in a row.
+  - A hit on Copito still vanishes immediately (unchanged) — only misses
+    that reach the ground stack up; this matches what was actually asked
+    for ("they are going to stack, where they landed, like on the ground").
+  - **Known interaction, not a bug:** `maxSnowballs` (pool size, 12) is
+    shared between flying + landed + free. With up to 8 reserved for landed,
+    only 4 slots cycle for actively-in-flight balls. Fine at normal human
+    throwing pace (cooldown 0.25s, typical flight-to-ground well under 1s in
+    testing) — only matters if someone spams throws far faster than balls
+    can land, in which case the round-robin would start recycling slots
+    sooner than `maxLandedSnowballs` would suggest. Not tuned further since
+    it didn't come up in testing; revisit `maxSnowballs` upward if it ever
+    does.
+- **Tested this session** (same headless-pane constraint as step 3: no
+  on-demand `requestAnimationFrame`, so verified by manually driving
+  `tick()` in 16ms steps from real `spawn()`/event calls, not by watching
+  real-time flight): confirmed landed count climbs then holds exactly at
+  `maxLandedSnowballs` (8) across 11 scripted misses, with evicted slots
+  correctly returning to `free`; confirmed the 3-hit sequence against Copito
+  (hitCount 1 → squash + flash + puff fire, 2 → crack decal appears, 3 →
+  resets cleanly, crack hidden again); confirmed a landed pile is visibly a
+  flattened white mound in a screenshot (see session), not just correct
+  state. Zero console errors throughout. **Not yet tested: an actual Quest 2
+  headset** (hit reactions and the landed pile from real trigger throws,
+  not scripted ones) — same outstanding item as step 3.
+
+**Step 4 follow-up round (same session, after Vincent's first look):** four
+issues reported against the above, all fixed:
+
+1. **Hitbox missed the head/hat.** The "hit" check was a single sphere
+   centered on Copito's root (his feet), radius 0.5 — anything above ~0.5m
+   (most of the body) was outside it. Changed to a capsule: horizontal
+   distance (unchanged 0.5 radius) + a height range from the ground to
+   `snowmanHeight + hitHeightMargin`. Now covers him head-to-foot.
+2. **Crack decal looked disconnected from the moving body**, and once fixed,
+   the first crack read great but the second one didn't. Two separate
+   causes:
+   - The decal was parented to the outer, non-animated entity while all of
+     Copito's own animation (bob/sway, and the new squash/wobble) applies to
+     a different, inner node — so the crack just sat still while the body
+     moved under it. Fixed by parenting the decals **inside** the model
+     wrapper itself (`copito.worldToModelLocal` converts an authored
+     "el-local meters" position into the wrapper's raw/pre-scale local
+     space once, at build time), so they now inherit every animation
+     automatically through the normal object3D parent-child hierarchy —
+     no per-frame syncing code needed.
+   - Separately, while debugging that, found and fixed a **real bug**: the
+     new hit-wobble/squash was rotating and scaling the model wrapper
+     directly, but the wrapper's own local origin (an artifact of the
+     glTF's messy raw export transform, see `copitoOffset`'s comment) sits
+     far from the visible mesh. Rotating/scaling around it swung Copito's
+     whole body sideways by up to ~0.5m instead of wobbling in place —
+     confirmed by sampling world position before/after in-browser. Fixed by
+     adding `hitPivot`, a plain, well-centered rotation/scale point
+     (`CONFIG.hitPivotHeight`, roughly mid-body) that the model wrapper
+     nests inside; squash/wobble now apply to `hitPivot`, while the
+     pre-existing idle bob/sway stay exactly as they were on the model
+     wrapper (untouched, to avoid regressing already-approved behavior).
+     After the fix, displacement during a full-amplitude wobble dropped
+     from ~0.5m to ~0.05m in testing.
+   - The "crack 2 looks worse" complaint itself turned out to be the two
+     decals' glow halos overlapping (crackSize was bumped up for
+     visibility, see next point, and the glow radius was a fraction of
+     that size, so it grew right along with it) — crack 1's wide halo was
+     bleeding across and washing out crack 2. Fixed by tightening the glow
+     radius fractions so each crack's halo hugs its own lines instead of
+     flooding the whole decal plane; confirmed visually afterward that both
+     read as distinct, legible fractures at normal viewing distance.
+3. **Crack asked to be bigger/more impactful:** `CONFIG.crackSize` raised
+   (0.42 → 0.75), line widths and branch reach increased, and an extra
+   "core" glow layer added on top of the outer halo for a punchier look —
+   balanced against the overlap fix above so it stays readable with
+   several cracks on screen at once.
+4. **Snowballs landing at the same spot now stack vertically** instead of
+   overlapping flat on the ground (`snowball-thrower.land`/`findStackBase`:
+   a landing within `CONFIG.landedStackRadius` of an existing pile snaps
+   onto its current top instead of ground level). Cap raised to 12 (top of
+   Vincent's requested 10-12 range, for a more satisfying pile) and pool
+   size bumped 12 → 16 so flying/cooldown balls still have slots once the
+   ground is full. **One real consequence found and fixed:** evicting the
+   *oldest* landed ball once over the cap, when that ball happens to be
+   buried at the base of a tall single-spot stack, would otherwise cascade
+   and collapse the *entire* pile at once (confirmed in testing: 13 throws
+   at one exact spot dropped the count from 12 straight to 0). Fixed by
+   making cap-eviction (`evictForCap`) always target the oldest ball that's
+   currently the *top* of its own pile, never a buried one — a tall stack
+   now caps out gracefully instead of periodically collapsing. A separate
+   `freeLanded` (cascade-on-removal) is kept for the other path where a
+   slot genuinely has no choice but to be reused (the pool's round-robin
+   landing on an occupied slot in `spawn()`), so nothing is ever left
+   visually floating.
+
+**Two more requests folded in as "future-proofing" (no new user-facing
+feature built, just removed two single-instance assumptions that would
+otherwise block this later):**
+
+- **Scalable "lives":** `CONFIG.hitsToExplode` (default 3, lives up to a
+  tested 7) now drives the crack system directly — `generateCrackPositions
+  (count)` procedurally lays out `hitsToExplode - 1` crack decals around a
+  widening front arc (no more hardcoded two-position list), and
+  `onHit`'s squash/wobble amplitude ramps via `lerp` across
+  `hitSquashAmplitudeRange`/`hitWobbleAmplitudeRange` instead of a
+  fixed 2-entry table indexed by hit number. Verified in-browser with
+  `hitsToExplode` temporarily set to 7: 6 cracks generated, each revealed
+  one at a time across 6 hits, clean reset on the 7th, zero console errors.
+  **Not built:** an actual bigger-snowman visual variant for the higher
+  end of that range — Vincent explicitly said not to build that yet, this
+  just keeps the hit/crack code from having to be reworked when it happens.
+- **Multiple snowmen on the map:** `snowball-thrower` no longer hardcodes
+  `#copito` as the one hit target. Every `copito` component instance
+  registers itself into a module-level `copitoRegistry` on init (and
+  deregisters in `remove()`); the thrower's capsule hit-check
+  (`findHitSnowman`) loops that registry and emits `snowball-hit` on
+  whichever snowman was actually hit. Also fixed a latent id collision that
+  would have bitten this immediately: the blob-shadow and crack-decal
+  `<img>` assets used fixed ids (`#blobShadow`, `#crackDecal0`) — a second
+  snowman would have silently reused the first one's textures via DOM id
+  collision. Each `copito` instance now gets a unique `instanceId`
+  (`copitoInstanceCounter`) and namespaces its own asset ids with it.
+  **Not built:** actually placing more than one snowman entity in the
+  scene — that's a content/placement change for whenever it's wanted, not
+  a code change, now that the lookup side is generic.
+
+**Step 4 crack redesign (same session, after Vincent shared a hand-drawn
+reference):** replaced the crack system entirely with a "snowman type"
+model, per a hand-drawn sketch Vincent shared (crossing curved bands, not
+flat jagged fracture decals).
+
+- **Only four valid types: 1, 3, 5, or 7 lives** (`CONFIG.hitsToExplode`).
+  Type 1 dies on the first hit with no crack at all. Every other type shows
+  one crack per hit, building toward death.
+- **Six fixed crack "slots"**, each a fixed color and a fixed crossing
+  angle: 1 (red) / 2 (amber) is the pair always shown right before death,
+  for any type that has at least 3 lives; 3 (pink) / 4 (green) is added
+  before that for type 5+; 6 / 7 (both blue) is added before even those,
+  only for type 7. `CRACK_MASTER_ORDER = [6, 7, 3, 4, 1, 2]` encodes this
+  once; `getCrackSlotsForLives(lives)` just takes the **last** `lives - 1`
+  entries of it -- a tougher snowman gets earlier cracks *prepended*, never
+  new ones appended after 1/2, so "cracks 1, 2, then dies" stays true for
+  every type that reaches them. Verified for all four types plus an
+  off-list value (4 snaps to the nearest valid type, 3, rather than
+  producing a broken half-pair).
+- **Every active crack crosses through the same central point** on the
+  torso (`CONFIG.crackCenter`), not spread to different spots -- matching
+  Vincent's sketch, where all the lines cross near the belly. This also
+  simplified the code a lot versus the previous per-crack-position
+  generator: since all decals share one position, only the *texture* needs
+  to differ per slot (drawn at `CRACK_SLOTS[slot].angle`), not the plane's
+  world transform. Decals are nudged a hair apart in z (0.002 model-local
+  units per slot) purely to avoid z-fighting between coplanar planes --
+  visually imperceptible.
+- **Curved sweep, not jagged fracture.** Vincent confirmed the original
+  hit-1 crack's curve/arc was good and a flat decal plane (not a true 3D
+  band wrapping the body, confirmed not needed) is sufficient. Rewrote
+  `makeCrackTexture` to draw one smooth quadratic-bezier stroke through the
+  shared center (core line + glow halo + highlight), replacing the earlier
+  branching-fracture canvas code entirely. `mulberry32` (the old PRNG for
+  randomizing branch patterns) is no longer used anywhere and was removed.
+- **Tested this session:** `getCrackSlotsForLives` output checked directly
+  for all four types (plus the off-list snap case); default type 3 (shows
+  slots [1,2]) and type 7 (shows all six) both exercised through full hit
+  cycles with screenshots confirming the crossing-curves look matches the
+  reference sketch at both close range and normal play distance; zero
+  console errors with `hitsToExplode` set at load time (the realistic way
+  this would ever be configured). **One false alarm during testing:**
+  reloading with `hitsToExplode` hot-swapped at runtime via
+  `removeAttribute`/`setAttribute` (an abnormal test-only technique, not
+  how the game ever actually reconfigures this) produced one THREE.js NaN
+  bounding-sphere console error; confirmed it does NOT reproduce when the
+  value is set the normal way (edited in CONFIG before page load) --
+  logged here only so a future session doesn't need to re-derive this if
+  the same red herring resurfaces.
+- **Not yet tested:** an actual Quest 2 headset, same outstanding item as
+  every step since step 3.
+
+**Step 4 crack redesign, round 2 (same session, after Vincent reviewed the
+first redesign against a screenshot):** three more issues, all fixed:
+
+1. **Color.** Vincent wanted the original cyan/glow look back (not the
+   red/amber/pink/green/blue-per-slot palette from redesign round 1). All
+   six slots now share one color (`CONFIG.colors.crackCore` '#0A2A28' /
+   `crackGlow` '#7DF9FF'), restored into `CONFIG.colors` after having been
+   removed.
+2. **Actually hugging the body, not a flat floating card.** The flat decal
+   plane read as detached/floating once seen up close (visible gap between
+   the glowing line and the body surface beneath it). Replaced with a real
+   ribbon mesh: several short quad segments following a curve, each
+   oriented to the curve's local outward direction so it sits flush against
+   the body rather than being one rigid flat plane. Two approaches were
+   tried:
+   - **Raycasting the actual glTF mesh** for the curve's points (so it
+     would hug the *real*, not idealized, surface) seemed like the more
+     accurate choice, but repeatedly produced broken/pinched geometry in
+     testing -- traced to the scarf's surface detail (ridges, folds)
+     injecting noise into the per-point surface normals, which a
+     hand-rolled ribbon cross-section (`cross(tangent, normal)`) is
+     numerically sensitive to: a near-degenerate normal at one sample
+     collapses that point's ribbon width toward zero, reading as a pinch
+     or a "bowtie". Also cost real debugging time chasing what first
+     looked like a geometry bug but turned out to be the preview camera
+     sitting too close to the crack geometry (near-clip distortion) for
+     several iterations -- worth remembering if ribbon/curve geometry ever
+     looks broken again: check camera distance before assuming the math is
+     wrong.
+   - **An idealized sphere approximating the torso** (`CONFIG.crackTorso
+     Center`/`crackTorsoRadius`) replaced it: mathematically clean points
+     and normals by construction (a sphere's outward normal is just
+     `(point - center)`, never degenerate), and the torso is close enough
+     to actually spherical that it still reads as hugging the real body.
+     This is what shipped. If a future session wants to revisit true
+     mesh-hugging, the lesson here is to fix the ribbon math's robustness
+     to noisy normals first (e.g. smooth/average normals across neighbors,
+     or fall back to a stable reference direction when the cross product's
+     magnitude drops near zero) rather than assuming raycasting alone
+     will produce clean geometry.
+   - Each ribbon is a `THREE.Group` of two meshes (wide translucent glow +
+     narrow opaque core), built once per active slot and added directly to
+     `this.model.object3D` (raw three.js objects, not a-frame entities,
+     since the geometry is custom per crack) -- same "parent inside the
+     animated model" trick as the flat-decal version for free animation
+     tracking, confirmed still working (sampled world position during a
+     fresh squash/wobble impulse and again 100ms later: moves smoothly
+     with the body).
+3. **Not all 6 crossing one point.** With six bands converging on a single
+   spot (type 7), the result was visually busy and the two "outer" (6/7)
+   bands initially swept right across the eyes/face, which also read as
+   wrong because it visually conflicted with the hat. Split into two
+   separate crossing points instead: slots 1-4 (`group: 'torso'`) still
+   cross at the main torso center; slots 6/7 (`group: 'upper'`,
+   `CONFIG.crackUpperCenter`/`crackUpperRadius`) cross at a separate, lower
+   point spanning roughly chin-height down to the top of the scarf, clear
+   of both the eyes and the hat.
+- **Process note:** Vincent asked to see a rendered preview before each
+  round of changes landed in the file. Delivered by live-patching the
+  already-loaded page in the browser (mutating `CRACK_SLOTS`/CONFIG,
+  rebuilding the affected crack meshes, screenshotting) rather than editing
+  `index.html` and reloading each time -- let several layout/color options
+  get checked and discarded in-browser before committing to one and
+  porting it into the real component code, which is what actually landed.
+- **Tested this session:** the final design re-verified through the real
+  component code (not just the live-patched preview) for both type 3
+  (slots [1,2]) and type 7 (all six, split across the two crossing points)
+  with screenshots matching what was approved; hitbox, landing/stacking,
+  and the snowman registry all re-confirmed still working together (full
+  regression pass); zero console errors throughout.
+- **Not yet tested:** an actual Quest 2 headset, same outstanding item as
+  every step since step 3.
+
+**Step 4 crack redesign, round 3 (same session, after Vincent compared the
+round-2 result against an older reference screenshot):** he wanted the
+cracks "broader... a bit more longer to the boarder" and the shine back to
+how an earlier in-browser prototype looked ("glowing, super good") rather
+than the round-2 version, which read as flatter. Root cause and fix:
+
+1. **The real problem was the material, not the color.** Round 2 built
+   each crack as two stacked `THREE.MeshBasicMaterial` meshes (a wide
+   translucent "glow" + a narrow opaque "core"), both flat solid colors.
+   Flat solid color with transparency reads as *dull*, not *glowing*, even
+   with the exact right hex value — there's no falloff. Replaced both with
+   a **single mesh per crack, UV-mapped to a shared gradient texture**
+   (`getCrackGlowTexture`, module-level cached `THREE.CanvasTexture`: an
+   8x128 canvas painted with a vertical gradient — transparent at the
+   edges, rising through the glow color, white-hot at the dead center) and
+   `THREE.AdditiveBlending`. A true soft falloff plus additive blending is
+   what actually reads as "glowing" — this was validated first by
+   live-patching the loaded page (building one prototype ribbon with the
+   gradient texture before touching `index.html`) and only ported into the
+   real `copito.buildCrackDecal`/`buildCrackRibbonMesh` once the live
+   result matched what Vincent had asked for.
+2. **Broader + longer:** `CONFIG.crackCoreWidth`/`crackGlowWidth`/
+   `crackGlowOpacity` (two separate widths for the old two-mesh approach)
+   collapsed into one `CONFIG.crackWidth: 0.09` (up from the old
+   0.02/0.05) for the new single-mesh ribbon, and every slot's `sweep` in
+   `CRACK_SLOTS` was widened (torso slots 1-4: 85°/70°→100°/85°, upper
+   slots 6/7: 48°→60°) so each crack reaches further around the body
+   toward its edge, per "make it a bit more longer to the boarder."
+3. **`CONFIG.colors.crackCore` dropped** — the old dark "core" color is no
+   longer needed since the gradient texture's own white-hot center
+   supplies that contrast; only `crackGlow` ('#7DF9FF', unchanged) remains.
+- **Tested this session:** fresh-tab console clean throughout (ruled out
+  the known stale-console-NaN red herring by cross-checking a new tab, see
+  the lesson above); `buildCrackDecal` confirmed returning a single `Mesh`
+  with the gradient texture as its `map` for every slot; full hit
+  progression driven through the real `onHit` path (not just manually
+  toggling decals) for type 3 — hit 1 shows slot 1 only, hit 2 adds slot 2,
+  hit 3 fires `snowman-destroyed` and resets `hitCount`/hides all decals —
+  each state screenshotted and visually matching the broader/glowing look
+  Vincent approved; type 7 checked separately with all six slots shown at
+  once to confirm the wider sweep doesn't make them collide awkwardly.
+- **Lesson:** debugging a camera framing issue during this round's
+  screenshot testing (a hand-rolled test camera facing backwards despite a
+  mathematically-verified-correct quaternion) burned real time before
+  switching to just repositioning the scene's existing default camera
+  entity instead of fighting a new one — same category as the earlier
+  near-clip lesson: when a screenshot looks wrong, suspect the *camera
+  setup* before the geometry, and prefer reusing a camera A-Frame is
+  already driving over hand-building a new one when scripting tests.
+
+<details>
+<summary>Original step 4 brief (superseded by the DONE notes above)</summary>
+
 - Hit 1: whole-model squash-stretch scale pulse + brief material
   color-flash (grab the mesh's material(s) via
   `this.model.getObject3D('mesh').traverse(...)`, tween color/emissive then
@@ -397,6 +747,8 @@ single-mesh model):**
   over the front of the torso — independent of mesh structure, works fine)
   + sparkle system sped up + crack sound.
 - Hit 3: hands off to step 5.
+
+</details>
 
 **Step 5 — explosion + respawn: not started.** Chunks (40-60): use
 `THREE.InstancedMesh` (two instances — snow lumps, ice shards — already
