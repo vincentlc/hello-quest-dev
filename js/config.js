@@ -187,19 +187,17 @@ export var CONFIG = {
   waveMaxConcurrentSnowmen: 8,   // cap once past the authored WAVE_TABLE (see getWaveConfig)
   waveIntermissionDelay: 2.5,    // seconds of calm between a wave clearing and the next starting
   waveDestroyBonusPerLife: 10,   // score per "life" (hitsToExplode) on a kill -- a type-7 kill is worth more than a type-1
+  waveBonusStartWave: 5,
   waveClearBonus: 50,
-  // Soft, low-stakes time bonus for clearing a wave quickly -- no fail
-  // state, no countdown UI, per the user ("could be soft time but not
-  // too exigent... nor important for now"). Decays linearly to 0, never
-  // negative. Step 7 improvement: scaled per snowman in the wave
-  // (wave-director.scheduleNextWave) rather than one flat budget for
-  // every wave regardless of size -- each snowman grants this many
-  // "free" seconds before the bonus starts decaying, and this many
-  // extra max-bonus points, so a big late-game wave isn't squeezed
-  // against the same clock as wave 1's single snowman.
+  waveClearBonusIncreasePerWave: 10,
   waveSoftTimerSecondsPerSnowman: 5,
   waveSoftTimerBonusPerSnowman: 10,
   waveSoftTimerDecayPerSecond: 1,
+  waveTimeBonusIncreasePerWave: 0.1,
+  waveEfficiencyStartWave: 7,
+  waveEfficiencyBonusBase: 0.1,
+  waveEfficiencyBonusIncreasePerWave: 0.05,
+  waveEfficiencyBonusMax: 0.5,
 
   // End-of-run credits screen (step 7). Modular on purpose: once
   // (waveIndex + 1) reaches this number, wave-director stops scheduling

@@ -2,7 +2,7 @@ import { I18N, LANG } from '../i18n.js';
 import { createTextPlane } from '../core/canvas-text.js';
 
 // ---------------------------------------------------------------------
-// wave-hud: a minimal, head-locked HUD -- a small wave/score text
+// wave-hud: a minimal, head-locked HUD -- a small wave/score/bonus text
 // panel, so there's *some* answer to "where's the level/score" in VR
 // (a 2D page overlay like #credit isn't visible inside the headset).
 // Goes on the camera entity: as its child, the text panel inherits the
@@ -39,9 +39,9 @@ AFRAME.registerComponent('wave-hud', {
     this.el.appendChild(this.panel);
 
     this.card = createTextPlane({
-      width: 0.46, height: 0.2,
-      canvasWidth: 512, canvasHeight: 224,
-      text: '', align: 'left', color: '#FFFFFF', fontSize: 52, paddingX: 26,
+      width: 0.62, height: 0.34,
+      canvasWidth: 768, canvasHeight: 384,
+      text: '', align: 'left', color: '#FFFFFF', fontSize: 40, paddingX: 26,
       background: 'rgba(6, 32, 30, 0.6)', backgroundRadius: 28
     });
     this.panel.object3D.add(this.card.mesh);
@@ -55,7 +55,9 @@ AFRAME.registerComponent('wave-hud', {
 
   updateText: function (detail) {
     var lang = I18N[LANG];
-    this.card.setText(
-      lang.wave + ' ' + (detail.waveIndex + 1) + '\n' + lang.score + ': ' + Math.round(detail.score));
+    var text = lang.wave + ' ' + (detail.waveIndex + 1) +
+      '\n' + lang.score + ': ' + Math.round(detail.score);
+    if (detail.announcement) text += '\n' + detail.announcement;
+    this.card.setText(text);
   }
 });

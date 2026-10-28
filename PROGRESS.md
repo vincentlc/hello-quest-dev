@@ -25,8 +25,9 @@ not current.
 **Current step: Step 6 (sound + haptics) — not started.** Steps 1-5bis and
 7 are done (desktop/Browser-pane verified; see the caveat below). Step 7
 was picked up out of order (user request); 6 and 8 are still open. Steps
-9 and 11 remain open; step 10's implementation is complete, with rendered
-visual verification still pending. These steps do not block 6-8 —
+9, 11, and 12 remain open; step 10's implementation is complete, with
+rendered visual verification still pending. Step 13 is now implemented.
+These steps do not block 6-8 —
 pick them up whenever, each as its own branch + PR per `CLAUDE.md`.
 
 **Outstanding across every step since step 3:** none of this has been tried
@@ -48,7 +49,7 @@ Keep that in mind before calling anything "done" in the VR-comfort sense.
 | 10 | Per-difficulty snowman textures + bigger type-7 + fog spawns | ✅ Implemented; rendered verification pending |
 | 11 | Landscape progression after wave 5 / wave 10 | ⬜ Not started |
 | 12 | Lose condition: snowmen approach + touch the player | ⬜ Not started |
-| 13 | Scoring: accuracy bonus | ⬜ Not started |
+| 13 | Scoring: accuracy bonus | ✅ Implemented |
 
 Steps 9-13 were scoped in a planning session on 2026-10-28; full
 implementation detail for each lives inline in its own entry below in
@@ -1450,9 +1451,8 @@ requested polish item:
 
 **Step 7 follow-up round 2 (same session, after the user asked how
 scoring works and what could improve):** three scoring changes, two
-implemented now, one deliberately deferred to step 13 (see that step's
-entry) per the user's own call ("me parece, pero quizás lo ponemos en
-progress como otra etapa").
+implemented in that round; accuracy was deferred to step 13 and has since
+been implemented (see that step's entry).
 
 1. **Best score, persisted.** New `js/core/best-score.js`
    (`getBestScore`/`updateBestScore`, `localStorage`, try/catch-guarded
@@ -1884,45 +1884,28 @@ scene unreadable at peak opacity.
 </details>
 
 <details>
-<summary><strong>Step 13 — scoring: accuracy bonus (⬜ Not started)</strong></summary>
+<summary><strong>Step 13 — progressive scoring bonuses (✅ Implemented)</strong></summary>
 
-**Scoped 2026-10-28, not yet implemented** (requested alongside the step 7
-scoring improvements below, but deliberately deferred to its own step
-rather than folded in -- the user's call: "me parece [buena idea], pero
-quizás lo ponemos en progress como otra etapa"). Idea: reward *accuracy*,
-not just survival/speed -- right now a miss costs nothing (see step 4's
-snowball packing/landing system, misses just pile up on the ground), so a
-player spamming throws scores identically to one aiming carefully, besides
-the wave-clear time bonus (step 7) which only rewards overall wave speed,
-not per-target precision.
+The user clarified that bonuses should start at wave 5 and grow progressively:
+time and wave-clear bonuses begin at wave 5; ball-use/accuracy bonuses begin
+at wave 7. Implemented in `js/components/wave-director.js`:
 
-Two options floated, not yet chosen between:
+- Base snowman points remain 10/30/50/70 (10 per hit/life). The floating
+  popup now says how many hits earned those points.
+- Wave 1-4 have no wave-clear or time bonus. Starting at wave 5, the clear
+  bonus starts at 50 and grows by 10 each wave. The soft timer remains
+  forgiving and scales with the number of snowmen; its maximum reward grows
+  by 10% per wave after wave 5.
+- Starting at wave 7, accuracy earns a share of the wave's base snowman
+  score. It starts at 10%, increases by 5 percentage points per wave, and
+  caps at 50%; the award is scaled by the wave's hit/throw ratio.
+- A wave-clear announcement in the HUD shows each bonus and the accuracy
+  rate, so the total score has a visible explanation.
 
-1. **Per-snowman "clean kill" bonus**: extra points if a snowman was
-   destroyed without any snowball fired at it missing (tracked per
-   registered snowman -- `copitoRegistry`, see `js/registry/
-   copito-registry.js`, already has one entry per active snowman;
-   `snowball-thrower.findHitSnowman` already knows which snowman a given
-   flying snowball was aimed near when it misses, though "aimed near"
-   vs "truly aimed at that one" would need a definition for multi-snowman
-   waves where more than one target is in a throw's rough path).
-2. **Wave-level "no misses" streak**: track total throws vs total hits for
-   the whole wave (simpler to implement -- `snowball-thrower` already
-   knows every throw via the `snowball-thrown` event added in step 7, and
-   every hit via `snowball-hit`), bonus if the ratio is 100% (or above some
-   threshold) when the wave clears.
-
-Option 2 is simpler and doesn't need per-snowman attribution, so it's the
-likely starting point unless the user asks for the more granular per-kill
-version. Either way: new `CONFIG` constant(s) for the bonus amount, wired
-into `wave-director`'s existing `onSnowmanDestroyed`/`scheduleNextWave`
-scoring path (same place the step 7 per-kill and time bonuses live), and a
-new counter somewhere tracking throws-vs-hits per wave (reset in
-`startWave`). Should show up on the end screen's score breakdown
-eventually too, once there is one (today's end screen just shows one
-final total, see step 7 -- if accuracy bonus lands, consider breaking the
-total into separate score-breakdown lines there, since multiple bonus
-sources are getting hard to infer from one number).
+The per-wave throw and hit counters reset at each wave; a dedicated
+`snowball-hit-registered` event carries the throw ID and is emitted before
+snowman hit handling, so the final impact is included while throws from an
+intermission or a previous wave cannot inflate the next wave's accuracy.
 
 </details>
 
