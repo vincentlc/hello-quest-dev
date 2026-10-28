@@ -10,19 +10,16 @@ import { createTextPlane } from '../core/canvas-text.js';
 // code needed, the same way trajectory-preview's hand dots inherit
 // their source entity's transform.
 //
-// Deliberately placed low and off-center (see the position below), not
-// dead-center in view: a panel locked to the exact center of a VR
-// headset's view is the classic "head-locked UI" discomfort case (no
-// parallax, feels pasted onto your eyeballs rather than part of the
-// world) -- peripheral placement reads more like a corner HUD in a
-// normal game.
+// Deliberately placed near the upper edge, not dead-center in view: a
+// panel locked to the exact center of a VR headset's view is the
+// classic "head-locked UI" discomfort case (no parallax, feels pasted
+// onto your eyeballs rather than part of the world). This also keeps it
+// clear of the snowmen's hats and painted hit-count numbers.
 //
 // Step 7 fix: the original position (0.55 -0.35 -1.2) put the panel
 // about 25 degrees off-axis -- past the zone each lens renders crisply
-// on a Quest 2, so on-device it showed up jammed into the very corner
-// of the visible image instead of as a readable corner HUD (reported:
-// "can see it in a corner... but not currently visible"). Pulled in to
-// ~15-19 degrees off-axis (still clearly peripheral, not dead-center).
+// on a Quest 2. It was pulled in to ~15-19 degrees; this upper-center
+// placement preserves that readable angle without covering snowmen.
 //
 // Text is a canvas-texture plane (see canvas-text.js), not A-Frame's
 // `text` component -- its bundled font turned out to have zero
@@ -38,7 +35,7 @@ import { createTextPlane } from '../core/canvas-text.js';
 AFRAME.registerComponent('wave-hud', {
   init: function () {
     this.panel = document.createElement('a-entity');
-    this.panel.setAttribute('position', '0.3 -0.22 -1.1');
+    this.panel.setAttribute('position', '0 0.42 -1.3');
     this.el.appendChild(this.panel);
 
     this.card = createTextPlane({

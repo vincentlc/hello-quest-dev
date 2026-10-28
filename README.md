@@ -7,9 +7,10 @@ next.
 
 **Current status:** core gameplay is implemented: snowball throwing, hit
 reactions, explosions, waves, and HUD. Snowman toughness is signaled by
-accessory colors and the type-7 snowman is larger; tougher snowmen can also
-appear in the fog. Sound and the remaining planned steps are tracked in
-`PROGRESS.md`.
+bright hat colors with the required hit count painted directly onto each
+hat; type 7 is twice the normal size. Tougher snowmen can also appear in the
+fog, and kills show their point award above the snowman. Sound and the
+remaining planned steps are tracked in `PROGRESS.md`.
 
 ## Run it on desktop (Chrome)
 
@@ -38,9 +39,10 @@ for console errors and FPS.
 ## Tuning
 
 Tunable values live in `js/config.js`; visible text lives in `js/i18n.js`.
-The original type-1 snowman texture stays unchanged. Types 3, 5, and 7 use
-accessory recolors, with type 7 scaled to 1.5x; type-5/7 snowmen have a 60%
-chance of spawning in the outer fog band.
+Each snowman type uses a bright hat and a painted dark-blue hit-count number
+on the hat texture; the original source texture remains unchanged. Type 7 is
+scaled to 2x. Type-5/7 snowmen have a 60% chance of spawning in the outer fog
+band. Three throws start a run; five throws restart after the credits screen.
 
 ## Credits
 

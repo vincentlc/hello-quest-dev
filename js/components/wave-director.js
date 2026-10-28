@@ -1,6 +1,7 @@
 import { CONFIG } from '../config.js';
 import { getWaveConfig } from '../data/wave-table.js';
 import { pickSpawnPoints } from '../core/spawn-placement.js';
+import { createTextPlane } from '../core/canvas-text.js';
 
 // ---------------------------------------------------------------------
 // wave-director (step 5 bis, new -- not in the original spec): lives on
@@ -24,32 +25,84 @@ import { pickSpawnPoints } from '../core/spawn-placement.js';
 // explosion PointLight) that live directly on the scene's object3D.
 // ---------------------------------------------------------------------
 AFRAME.registerComponent('wave-director', {
-  // No tick() here on purpose -- every state change this component
-  // cares about is event- or timer-driven (a kill, a cleared pool slot,
-  // an intermission timeout), never a per-frame update, so there's
-  // nothing a tick() would buy it. Timing runs on performance.now() and
-  // setTimeout instead (see startWave/scheduleNextWave).
+  // The only per-frame work is advancing the small pool of floating
+  // score popups. Wave state itself remains event- and timer-driven.
   init: function () {
     this.waveIndex = -1;
     this.score = 0;
     this.aliveThisWave = 0;
     this.waveStartAt = 0;
+    this.gameStarted = false;
     this.pools = {}; // hitsToExplode -> [{el, inUse}], see getPoolEntity
+    this.buildScorePopups();
 
     this.el.addEventListener('snowman-destroyed', (evt) => this.onSnowmanDestroyed(evt));
     this.el.addEventListener('snowman-cleared', (evt) => this.onSnowmanCleared(evt));
-    // end-screen.js re-emits this once a snowball is thrown while the
-    // post-credits freeze is active (see scheduleNextWave below) --
-    // restart is just "start over at wave 1 with the score reset".
+    this.el.addEventListener('start-game', () => this.startFirstWave());
     this.el.addEventListener('restart-game', () => this.restart());
+  },
 
-    // Deferred a macrotask past init (not called directly here):
-    // startWave appends new DOM entities (the pool, see
-    // getPoolEntity), and this component's own init() still runs
-    // synchronously during the scene's initial attach pass, before the
-    // first real frame -- the same early-timing window that caused the
-    // camera race above. A plain setTimeout(0) reliably lands after it.
-    setTimeout(() => this.startWave(0), 0);
+  buildScorePopups: function () {
+    this.scorePopups = [];
+    for (var i = 0; i < CONFIG.waveMaxConcurrentSnowmen; i++) {
+      var popup = createTextPlane({
+        width: 0.8,
+        height: 0.3,
+        canvasWidth: 512,
+        canvasHeight: 192,
+        color: '#FFF5A6',
+        fontSize: 128,
+        bold: true,
+        background: 'rgba(8, 39, 35, 0.88)',
+        backgroundRadius: 28
+      });
+      popup.mesh.visible = false;
+      popup.mesh.material.depthTest = false;
+      popup.mesh.material.depthWrite = false;
+      popup.mesh.material.fog = false;
+      this.el.object3D.add(popup.mesh);
+      this.scorePopups.push({ mesh: popup.mesh, setText: popup.setText, startedAt: 0 });
+    }
+  },
+
+  startFirstWave: function () {
+    if (this.gameStarted) return;
+    this.gameStarted = true;
+    this.startWave(0);
+  },
+
+  showScorePopup: function (snowman, points) {
+    var now = performance.now();
+    var popup = this.scorePopups.find((item) => !item.mesh.visible) ||
+      this.scorePopups.reduce((oldest, item) => item.startedAt < oldest.startedAt ? item : oldest);
+    snowman.el.object3D.getWorldPosition(popup.mesh.position);
+    popup.mesh.position.y += CONFIG.snowmanHeight * snowman.sizeScale + CONFIG.scorePopupHeight;
+    popup.startY = popup.mesh.position.y;
+    popup.mesh.material.opacity = 1;
+    popup.setText('+' + points);
+    popup.startedAt = now;
+    popup.mesh.visible = true;
+  },
+
+  updateScorePopups: function () {
+    var camera = this.el.camera;
+    var now = performance.now();
+    for (var i = 0; i < this.scorePopups.length; i++) {
+      var popup = this.scorePopups[i];
+      if (!popup.mesh.visible) continue;
+      var age = (now - popup.startedAt) / 1000;
+      if (age >= CONFIG.scorePopupDuration) {
+        popup.mesh.visible = false;
+        continue;
+      }
+      popup.mesh.position.y = popup.startY + age * 0.2;
+      popup.mesh.material.opacity = 1 - age / CONFIG.scorePopupDuration;
+      if (camera) camera.getWorldQuaternion(popup.mesh.quaternion);
+    }
+  },
+
+  tick: function () {
+    this.updateScorePopups();
   },
 
   // Finds a free pool entity of the given type, or grows that type's
@@ -120,7 +173,9 @@ AFRAME.registerComponent('wave-director', {
   onSnowmanDestroyed: function (evt) {
     var component = evt.target.components && evt.target.components.copito;
     if (!component) return;
-    this.score += CONFIG.waveDestroyBonusPerLife * component.hitsToExplode;
+    var points = CONFIG.waveDestroyBonusPerLife * component.hitsToExplode;
+    this.score += points;
+    this.showScorePopup(component, points);
     this.aliveThisWave--;
     this.emitState();
     if (this.aliveThisWave <= 0) this.scheduleNextWave();

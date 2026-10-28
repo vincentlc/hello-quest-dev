@@ -5,8 +5,10 @@
 // ---------------------------------------------------------------------
 export var I18N = {
   es: {
-    instructionVR: '¡Apunta y aprieta el gatillo para lanzar bolas de nieve!',
-    instructionDesktop: 'Haz clic para lanzar',
+    instructionVR: 'Aprieta 3 veces para comenzar',
+    instructionDesktop: 'Haz clic 3 veces para comenzar',
+    shotsProgress: 'Lanzamientos',
+    restartProgress: 'Lanzamientos para reiniciar',
     hits: 'Golpes',
     destroyed: 'Muñecos destruidos',
     wave: 'Oleada',
@@ -23,11 +25,13 @@ export var I18N = {
     bestScore: 'Mejor puntaje',
     newRecord: '¡Nuevo récord!',
     createdBy: 'Creado por Vincentlc',
-    restartHint: 'Lanza una bola de nieve para volver a jugar'
+    restartHint: 'Lanza 5 bolas de nieve para volver a jugar'
   },
   en: {
-    instructionVR: 'Aim and pull the trigger to throw snowballs!',
-    instructionDesktop: 'Click to throw',
+    instructionVR: 'Pull trigger 3 times to start',
+    instructionDesktop: 'Click 3 times to start',
+    shotsProgress: 'Throws',
+    restartProgress: 'Throws to restart',
     hits: 'Hits',
     destroyed: 'Snowmen destroyed',
     wave: 'Wave',
@@ -39,7 +43,7 @@ export var I18N = {
     bestScore: 'Best score',
     newRecord: 'New record!',
     createdBy: 'Created by Vincentlc',
-    restartHint: 'Throw a snowball to play again'
+    restartHint: 'Throw 5 snowballs to play again'
   }
 };
 export var LANG = 'es';

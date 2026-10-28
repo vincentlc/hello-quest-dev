@@ -19,24 +19,24 @@ import { getBestScore, updateBestScore } from '../core/best-score.js';
 // not UI glued to the camera) -- avoids the "pasted to your eyeballs"
 // discomfort a continuously head-locked full panel would cause.
 //
-// Restart: per the user's ask, any snowball throw while this panel is
-// up (snowball-thrower emits 'snowball-thrown' on every spawn(), see
-// that file) hides the panel and asks wave-director to restart from
-// wave 1 -- not an aimed hit on the panel itself, since requiring
-// precise aim right after reading an end screen isn't the point.
+// Restart requires a deliberate series of throws while the panel is up;
+// one accidental throw cannot dismiss the credits or restart the game.
 // ---------------------------------------------------------------------
 AFRAME.registerComponent('end-screen', {
   init: function () {
     this.active = false;
+    this.restartShotsThrown = 0;
+    this.finalScore = 0;
+    this.bestLine = '';
 
     this.built = buildPanel(this.el, {
       width: CONFIG.creditsPanelWidth,
       borderColor: CONFIG.colors.crownCyan,
       // Worst-case content: score line, best-score/new-record line, a
       // blank line, the creator credit, the CC-BY model credit (may
-      // wrap to 2), another blank line, then the restart hint (may
-      // wrap to 2) -- budget 10 so nothing in that combination clips.
-      bodyMaxLines: 10
+      // wrap to 2), another blank line, then the restart hint and count
+      // -- budget 11 so nothing in that combination clips.
+      bodyMaxLines: 11
     });
     this.panel = this.built.panel;
 
@@ -132,13 +132,12 @@ AFRAME.registerComponent('end-screen', {
 
     var lang = I18N[LANG];
     var isNewBest = updateBestScore(score);
-    var bestLine = isNewBest ? lang.newRecord : lang.bestScore + ': ' + getBestScore();
+    this.finalScore = score;
+    this.bestLine = isNewBest ? lang.newRecord : lang.bestScore + ': ' + getBestScore();
+    this.restartShotsThrown = 0;
 
     this.built.setTitle(lang.gameComplete);
-    this.built.setBody(
-      lang.finalScore + ': ' + Math.round(score) + '\n' + bestLine + '\n\n' +
-      lang.createdBy + '\n' + MODEL_CREDIT + '\n\n' +
-      lang.restartHint);
+    this.updateBody(lang);
 
     this.panel.setAttribute('visible', true);
     this.active = true;
@@ -147,8 +146,23 @@ AFRAME.registerComponent('end-screen', {
 
   onSnowballThrown: function () {
     if (!this.active) return;
-    this.active = false;
-    this.panel.setAttribute('visible', false);
-    this.el.emit('restart-game');
+    this.restartShotsThrown++;
+    var lang = I18N[LANG];
+    if (this.restartShotsThrown >= CONFIG.restartShotsToStart) {
+      this.active = false;
+      this.panel.setAttribute('visible', false);
+      this.el.emit('restart-game');
+      return;
+    }
+    this.updateBody(lang);
+  },
+
+  updateBody: function (lang) {
+    this.built.setBody(
+      lang.finalScore + ': ' + Math.round(this.finalScore) + '\n' + this.bestLine + '\n\n' +
+      lang.createdBy + '\n' + MODEL_CREDIT + '\n\n' +
+      lang.restartHint + '\n' + lang.restartProgress + ': ' +
+      this.restartShotsThrown + '/' + CONFIG.restartShotsToStart
+    );
   }
 });

@@ -13,7 +13,7 @@ export var CONFIG = {
   // centered and standing on the ground at CONFIG.snowmanHeight tall.
   copitoScale: 0.6324,
   copitoOffset: '-4.206 0.0574 3.6008',
-  bigSnowmanScaleMultiplier: 1.5,
+  bigSnowmanScaleMultiplier: 2,
 
   // Idle animation (step 2): bob + sway are added on top of
   // copitoOffset as deltas on the model wrapper, not the declarative
@@ -221,15 +221,15 @@ export var CONFIG = {
   creditsPanelWidth: 2.0,
   creditsParticleCount: 90,
 
-  // Welcome/intro panel (step 7, new): shown once right after load,
-  // explaining the throw control (desktop click vs the VR trigger,
-  // picked live off vr-mode) with a small controller icon highlighting
-  // the trigger -- see welcome-screen.js/controller-icon.js. Dismissed
-  // by the player's own first throw, or this timeout if they never
-  // throw, so it never lingers forever.
+  // Welcome/intro panel (step 7): stays up until the player has thrown
+  // enough snowballs to start a run; the credits panel uses a separate
+  // higher count to prevent accidental restarts.
   welcomePanelDistance: 1.7,
   welcomePanelWidth: 1.6,
-  welcomeAutoHideSeconds: 14,
+  welcomeShotsToStart: 3,
+  restartShotsToStart: 5,
+  scorePopupDuration: 1.4,
+  scorePopupHeight: 0.55,
 
   // Sound volumes 0 to 1 (step 6)
   volume: {
