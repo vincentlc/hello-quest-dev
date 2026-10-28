@@ -89,11 +89,12 @@
          A-Frame 1.7.0 component name for Quest Touch controllers (confirmed
          by grepping vendor/aframe.min.js -- oculus-touch-controls also
          exists as an older alias, same implementation). No laser-controls
-         anywhere: see hide-controller-line below for why that alone isn't
-         enough to keep the beam off. -->
-    <a-entity id="leftHand" meta-touch-controls="hand: left" hide-controller-line
+         anywhere: see controller-aim below for why that alone isn't enough
+         to keep the beam off, and for the pointing-direction fix it also
+         carries. -->
+    <a-entity id="leftHand" meta-touch-controls="hand: left" controller-aim
               trajectory-preview="source: hand"></a-entity>
-    <a-entity id="rightHand" meta-touch-controls="hand: right" hide-controller-line
+    <a-entity id="rightHand" meta-touch-controls="hand: right" controller-aim
               trajectory-preview="source: hand"></a-entity>
 
     <a-entity camera position="0 1.6 0" look-controls wasd-controls
@@ -331,22 +332,64 @@
     });
 
     // ---------------------------------------------------------------------
-    // hide-controller-line: meta-touch-controls (like every vendor
-    // touch-controls component) auto-attaches its own raycaster with
-    // showLine:true as soon as a controller connects -- confirmed by
-    // grepping vendor/aframe.min.js (its internal per-vendor mapping merges
-    // `{showLine: true}` as the default), not assumed from memory, per the
-    // step 1 lesson. The dotted trajectory arc is the only aim visual this
-    // demo wants (it shows the real gravity drop, a straight laser doesn't,
-    // and the original spec's own note says to keep hello_quest's laser
-    // hidden since it fights with the arc), so this flips the
-    // auto-added line back off every time the library turns it on.
+    // controller-aim: two jobs, both about the raycaster meta-touch-controls
+    // auto-attaches to the hand entity as soon as a controller connects
+    // (confirmed by grepping vendor/aframe.min.js -- its internal per-vendor
+    // mapping merges `{showLine: true}` as the default).
+    //
+    // 1. Hide its line. The dotted trajectory arc is the only aim visual
+    //    this demo wants (it shows the real gravity drop, a straight laser
+    //    doesn't, and the original spec's own note says to keep
+    //    hello_quest's laser hidden since it fights with the arc), so this
+    //    flips the auto-added line back off every time the library turns
+    //    it on.
+    // 2. Capture the controller's real pointing direction. `tracked-controls`
+    //    drives the hand entity's own object3D from the WebXR *grip* pose
+    //    (grepped vendor/aframe.min.js: its tick() calls
+    //    `frame.getPose(controller.gripSpace, ...)`), whose forward axis
+    //    points straight down the handle -- not out through the buttons the
+    //    way a laser pointer / remote naturally points. The correct
+    //    local-space offset for that (`rayOrigin: {origin, direction}`) is
+    //    emitted separately, per connected controller model, on the
+    //    `controllermodelready` event (same vendor source: meta-touch-
+    //    controls computes it from the WebXR "target ray" pose and emits it
+    //    once its model has loaded) -- it's the same data laser-controls
+    //    itself forwards into a raycaster, grabbed here directly so we don't
+    //    have to pull in laser-controls' cursor/model-swap baggage just for
+    //    this one number. snowball-thrower and trajectory-preview call
+    //    getAimRay() instead of reading object3D's forward axis directly.
     // ---------------------------------------------------------------------
-    AFRAME.registerComponent('hide-controller-line', {
+    AFRAME.registerComponent('controller-aim', {
       init: function () {
+        var THREE = AFRAME.THREE;
         var hide = () => this.el.setAttribute('raycaster', 'showLine', false);
         this.el.addEventListener('controllerconnected', hide);
-        this.el.addEventListener('controllermodelready', hide);
+        this.el.addEventListener('controllermodelready', (evt) => {
+          hide();
+          var rayOrigin = evt.detail && evt.detail.rayOrigin;
+          if (!rayOrigin) return;
+          this.rayOrigin = {
+            origin: new THREE.Vector3().copy(rayOrigin.origin),
+            direction: new THREE.Vector3().copy(rayOrigin.direction).normalize()
+          };
+        });
+      },
+
+      // Writes the world-space aim origin/direction into the given
+      // THREE.Vector3 outputs. Uses the controller's real pointing offset
+      // once known (after its model has loaded); falls back to the
+      // entity's own forward axis before that (e.g. the brief window right
+      // after connecting).
+      getAimRay: function (originOut, dirOut) {
+        if (this.rayOrigin) {
+          this.el.object3D.updateMatrixWorld();
+          originOut.copy(this.rayOrigin.origin);
+          this.el.object3D.localToWorld(originOut);
+          dirOut.copy(this.rayOrigin.direction).transformDirection(this.el.object3D.matrixWorld).normalize();
+        } else {
+          this.el.object3D.getWorldPosition(originOut);
+          this.el.object3D.getWorldDirection(dirOut);
+        }
       }
     });
 
@@ -411,8 +454,7 @@
 
       throwFromHand: function (handEl, sourceKey) {
         if (!this.canThrow(sourceKey)) return;
-        handEl.object3D.getWorldPosition(this.scratchOrigin);
-        handEl.object3D.getWorldDirection(this.scratchDir);
+        handEl.components['controller-aim'].getAimRay(this.scratchOrigin, this.scratchDir);
         this.spawn(this.scratchOrigin, this.scratchDir);
         pulseHaptics(handEl, CONFIG.haptics.throw[0], CONFIG.haptics.throw[1]);
       },
@@ -828,8 +870,7 @@
         }
 
         if (this.data.source === 'hand') {
-          this.el.object3D.getWorldPosition(this.scratchOrigin);
-          this.el.object3D.getWorldDirection(this.scratchDir);
+          this.el.components['controller-aim'].getAimRay(this.scratchOrigin, this.scratchDir);
         } else {
           var camera = this.el.sceneEl.camera;
           if (!camera) { this.setVisible(false); return; }

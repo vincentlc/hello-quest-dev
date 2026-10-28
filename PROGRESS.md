@@ -267,6 +267,8 @@ DONE.**
   back to `false` every time the library turns it on. Couldn't verify this
   on-device this session (no headset attached, see below); logic matches the
   vendor source exactly, flag if a beam still shows up on the Quest.
+  (Later renamed to `controller-aim` and given a second job — see the step 3
+  follow-up fix below.)
 - `snowball-thrower` (on `<a-scene>`): 12-entity object pool of `<a-sphere>`
   snowballs (radius `CONFIG.snowballRadius`, 8 segments, color
   `CONFIG.colors.snowball`), reused by round-robin index rather than a
@@ -315,6 +317,45 @@ DONE.**
   on-device, 72 fps during normal play) — do that before calling this step
   fully verified, same as step 1's "zero console errors" bar but for VR
   input this time.
+
+**Step 3 follow-up fix (separate session, after Vincent tried it on-device):
+aim direction was wrong.** Throws and the hand trajectory arc pointed
+straight down (out of the bottom of the controller, parallel to the cable)
+instead of out in front like a laser pointer. Root cause, confirmed by
+grepping `vendor/aframe.min.js`: `tracked-controls` (which `meta-touch-controls`
+depends on) drives each hand entity's `object3D` from the WebXR **grip**
+pose (`tick()` calls `frame.getPose(controller.gripSpace, ...)`) — grip
+space's forward axis runs down the physical handle, not out through the
+buttons the way a laser pointer naturally points. `throwFromHand` and
+`trajectory-preview`'s hand branch were reading that axis directly
+(`object3D.getWorldDirection`), so they inherited the wrong direction.
+The correct offset (a per-controller-model local `{origin, direction}`,
+tilted roughly 40° off grip-forward) is exactly what A-Frame's own
+`laser-controls` forwards into a raycaster — it's emitted by
+`meta-touch-controls` itself on the `controllermodelready` event's
+`detail.rayOrigin`, confirmed in the vendor source. Renamed
+`hide-controller-line` to **`controller-aim`** and had it also capture that
+`rayOrigin` (no need to pull in `laser-controls` itself, keeping the
+no-laser-line decision above) via a new `getAimRay(originOut, dirOut)`
+method, applying the exact same `localToWorld`/`transformDirection` math
+`raycaster.updateOriginDirection` uses internally. `throwFromHand` and
+`trajectory-preview` now call `getAimRay()` instead of reading the raw grip
+axis; falls back to the old `object3D`-based direction if a hand entity's
+model hasn't finished loading yet (same safe degradation as before, not a
+new risk). **Tested this session:** fresh-tab console clean (ruled out the
+already-known stale-NaN red herring by diffing against `main` — identical
+NaN appears on both, confirmed pre-existing and unrelated); the fallback
+path (no controller connected) verified unchanged by directly calling
+`getAimRay()` in-browser; the corrected path verified by injecting the real
+`meta-quest-touch-pro`/`-plus`/`oculus-touch-v3` left-hand `rayOrigin`
+values from the vendor table and confirming `getAimRay()` produces a
+clearly different, forward-tilted direction instead of the raw grip axis.
+**Not yet tested: an actual Quest 2 headset** — same outstanding item as the
+rest of step 3; this was fixed from the vendor source and A-Frame's own
+reference implementation, not by guessing numbers, but the real on-device
+feel (and whether this hardware reports as `meta-touch-controls`/
+`oculus-touch-v3` vs a Pro/Plus variant, which changes which `rayOrigin`
+table entry applies) still needs a real headset to confirm.
 
 <details>
 <summary>Original step 3 brief (superseded by the DONE notes above)</summary>
