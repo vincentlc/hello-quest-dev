@@ -276,7 +276,7 @@ AFRAME.registerComponent('wave-director', {
 
     this.score += clearBonus + timeBonus + accuracyBonus;
     console.log('[wave-director] wave ' + (this.waveIndex + 1) + ' cleared, score ' + Math.round(this.score));
-    this.emitState(announcement.join(' | '));
+    this.emitState(announcement.join('\n'));
 
     // Step 7: once the configured run length is cleared, freeze instead
     // of letting getWaveConfig keep generating waves forever -- hand off

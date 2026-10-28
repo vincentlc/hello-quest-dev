@@ -1900,7 +1900,10 @@ at wave 7. Implemented in `js/components/wave-director.js`:
   score. It starts at 10%, increases by 5 percentage points per wave, and
   caps at 50%; the award is scaled by the wave's hit/throw ratio.
 - A wave-clear announcement in the HUD shows each bonus and the accuracy
-  rate, so the total score has a visible explanation.
+  rate, so the total score has a visible explanation. The HUD uses its
+  original compact text size when there is no bonus notice; it expands
+  vertically while the bonus breakdown is displayed, then returns to its
+  compact size after five seconds at most (or when the next wave begins).
 
 The per-wave throw and hit counters reset at each wave; a dedicated
 `snowball-hit-registered` event carries the throw ID and is emitted before

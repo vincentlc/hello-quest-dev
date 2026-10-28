@@ -37,7 +37,8 @@ var RESOLUTION_SCALE = 2;
 
 // opts: { width, height (world meters), canvasWidth, canvasHeight,
 // text, align, color, fontSize, bold, background, backgroundRadius,
-// paddingX, startY }. canvasWidth/canvasHeight/fontSize/paddingX/startY
+// paddingX, startY, autoSizeHeight, autoSizeAnchorTop }.
+// canvasWidth/canvasHeight/fontSize/paddingX/startY
 // are "logical" pixels -- RESOLUTION_SCALE is applied internally, so
 // existing call sites don't need to change. Returns { mesh,
 // setText(text, overrideOpts) }.
@@ -60,13 +61,6 @@ export function createTextPlane(opts) {
 
   function setText(text, overrideOpts) {
     var o = Object.assign({}, baseOpts, overrideOpts || {});
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (o.background) {
-      ctx.fillStyle = o.background;
-      roundRectPath(ctx, 0, 0, canvas.width, canvas.height, (o.backgroundRadius || 0) * RESOLUTION_SCALE);
-      ctx.fill();
-    }
 
     var fontSize = (o.fontSize || Math.round(canvas.height * 0.14 / RESOLUTION_SCALE)) * RESOLUTION_SCALE;
     var lineHeight = fontSize * 1.3;
@@ -115,6 +109,47 @@ export function createTextPlane(opts) {
       });
       if (current) lines.push(current);
     });
+
+    if (o.autoSizeHeight) {
+      var baseCanvasHeight = (baseOpts.canvasHeight || 512) * RESOLUTION_SCALE;
+      var minHeight = baseCanvasHeight;
+      var textHeight = (lines.length - 1) * lineHeight +
+        (o.fontSize || Math.round(baseCanvasHeight * 0.14 / RESOLUTION_SCALE)) *
+        RESOLUTION_SCALE * 2.5;
+      var newCanvasHeight = Math.max(minHeight, Math.ceil(textHeight));
+      if (newCanvasHeight !== canvas.height) {
+        var oldGeometryHeight = mesh.geometry.parameters.height;
+        canvas.height = newCanvasHeight;
+        var newGeometryHeight = (o.height || baseOpts.height) * newCanvasHeight / baseCanvasHeight;
+        mesh.geometry.dispose();
+        mesh.geometry = new THREE.PlaneGeometry(o.width || baseOpts.width, newGeometryHeight);
+        if (o.autoSizeAnchorTop) {
+          mesh.position.y -= (newGeometryHeight - oldGeometryHeight) / 2;
+        }
+      }
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = weight + fontSize + 'px "Trebuchet MS", "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = align;
+
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+    if (o.background) {
+      ctx.fillStyle = o.background;
+      roundRectPath(ctx, 0, 0, canvas.width, canvas.height, (o.backgroundRadius || 0) * RESOLUTION_SCALE);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = color;
+    if (o.shadow !== false) {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+      ctx.shadowBlur = fontSize * 0.08;
+      ctx.shadowOffsetY = fontSize * 0.04;
+    }
 
     var x = align === 'center' ? canvas.width / 2
       : (align === 'right' ? canvas.width - paddingX : paddingX);

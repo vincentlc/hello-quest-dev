@@ -38,11 +38,14 @@ AFRAME.registerComponent('wave-hud', {
     this.panel.setAttribute('position', '0 0.42 -1.3');
     this.el.appendChild(this.panel);
 
+    this.baseText = '';
+    this.announcementTimeout = null;
     this.card = createTextPlane({
-      width: 0.62, height: 0.34,
-      canvasWidth: 768, canvasHeight: 384,
-      text: '', align: 'left', color: '#FFFFFF', fontSize: 40, paddingX: 26,
-      background: 'rgba(6, 32, 30, 0.6)', backgroundRadius: 28
+      width: 0.46, height: 0.2,
+      canvasWidth: 512, canvasHeight: 224,
+      text: '', align: 'left', color: '#FFFFFF', fontSize: 52, paddingX: 26,
+      background: 'rgba(6, 32, 30, 0.6)', backgroundRadius: 28,
+      autoSizeHeight: true, autoSizeAnchorTop: true
     });
     this.panel.object3D.add(this.card.mesh);
 
@@ -55,9 +58,22 @@ AFRAME.registerComponent('wave-hud', {
 
   updateText: function (detail) {
     var lang = I18N[LANG];
-    var text = lang.wave + ' ' + (detail.waveIndex + 1) +
+    this.baseText = lang.wave + ' ' + (detail.waveIndex + 1) +
       '\n' + lang.score + ': ' + Math.round(detail.score);
-    if (detail.announcement) text += '\n' + detail.announcement;
-    this.card.setText(text);
+    if (this.announcementTimeout !== null) {
+      clearTimeout(this.announcementTimeout);
+      this.announcementTimeout = null;
+    }
+
+    if (!detail.announcement) {
+      this.card.setText(this.baseText);
+      return;
+    }
+
+    this.card.setText(this.baseText + '\n' + detail.announcement.replace(/ \| /g, '\n'));
+    this.announcementTimeout = setTimeout(() => {
+      this.announcementTimeout = null;
+      this.card.setText(this.baseText);
+    }, 5000);
   }
 });
