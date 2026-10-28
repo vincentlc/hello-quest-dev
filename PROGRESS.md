@@ -1267,8 +1267,12 @@ a head/body rotation. Ask: make desktop Left/Right rotate the view
 instead. Confirmed with the user: **smooth continuous rotation** while a
 key is held (not snap-turn).
 
-**File:** `index.html` — camera entity (`<a-entity camera ...>`, currently
-`look-controls wasd-controls`), `CONFIG` block, one new component.
+**Files:** `index.html` — camera entity markup (`<a-entity camera ...>`,
+currently `look-controls wasd-controls`); `js/config.js` for the new
+CONFIG value; a new component file (e.g. `js/components/desktop-turn.js`,
+imported from `js/main.js` alongside the other components there) — see
+the "code is modularized" note in Environment facts above, this file
+layout postdates the original version of this plan.
 
 1. `CONFIG.desktopTurnSpeedDegPerSec = 90` (tunable later).
 2. Add `wasd-controls="adEnabled: false"` to the camera entity. Confirmed
@@ -1309,10 +1313,15 @@ from step 4/5bis) — no visual cue for toughness before you start hitting
 one. Ask: distinct look per type, plus make the type-7 ("hardest") snowman
 1.5x bigger, same shape.
 
-**Files:** `assets/models/copito/textures/` (new images), `index.html`
-(`<a-assets>`, `CONFIG`, `copito`'s `collectMaterials`/model-build code
-around the existing `copitoScale`/`copitoOffset`/`hitPivotHeight`
-application, and `snowball-thrower.findHitSnowman`'s hit-capsule check).
+**Files:** `assets/models/copito/textures/` (new images); `index.html`'s
+`<a-assets>` block (new preloaded `<img>` entries); `js/config.js` (new
+CONFIG values); `js/components/snowman/snowman-hit-reactions.js` (that's
+where `collectMaterials` actually lives post-modularization, not
+`snowman-core.js`); `js/components/snowman/snowman-core.js` (where
+`copitoScale`/`copitoOffset`/`hitPivotHeight` get applied, and where
+`init` would compute `this.sizeScale`); `js/components/snowball-thrower.js`
+(`findHitSnowman`'s hit-capsule check) and `js/registry/copito-registry.js`
+(would need to expose each instance's size multiplier to it).
 
 **Performance, addressed up front:** swapping which static image is bound
 as a mesh's base-color texture costs nothing extra at render time — it's
@@ -1403,9 +1412,10 @@ GIMP/Inkscape** done by the user, with Claude supplying exact steps once
 the base photo is chosen.
 
 **Files:** `index.html` (`<a-assets>`, the `<a-sky>`/ground `<a-circle>`
-entities, the scene's `fog` attribute, `CONFIG`, a new `landscape-director`
-component near the existing `wave-director`), plus 2 new photo asset pairs
-under `assets/sky/`.
+entities, the scene's `fog` attribute on `<a-scene>`); `js/config.js` (new
+CONFIG values); a new `js/components/landscape-director.js` (imported
+from `js/main.js` next to the existing `js/components/wave-director.js`
+it listens to); plus 2 new photo asset pairs under `assets/sky/`.
 
 1. User sources 2 new CC0 (or otherwise licensed + credited in
    `ASSETS.md`, same as the Sketchfab model) snow-landscape photos — same
@@ -1484,10 +1494,15 @@ looking for scaffolding that isn't there.
 
 ### Phase 1 — standard, softer: lives instead of instant death
 
-**Files:** `index.html` — `CONFIG`, `copito` (new per-tick movement,
-alongside its existing `updateFacing()`), `wave-director` (new `lives`
-state, the event listener, HUD payload), `wave-hud`/`I18N`, and
-`WAVE_TABLE` (a new optional per-row flag).
+**Files:** `js/config.js` (new CONFIG values);
+`js/components/snowman/snowman-core.js` (new per-tick movement, alongside
+its existing `updateFacing()` — both called from the same `tick()`);
+`js/components/snowman/snowman-component.js` (the new `approaches` schema
+field); `js/components/wave-director.js` (new `lives` state, the event
+listener, HUD payload via its existing `emitState()`);
+`js/components/wave-hud.js` + `js/i18n.js` (new `lives`/game-over
+strings); `js/data/wave-table.js` (a new optional per-row `approach`
+flag).
 
 1. `CONFIG.snowmanApproachSpeed` (m/s, e.g. `0.5`) and
    `CONFIG.meleeStopDistance` (e.g. `1.3`, comfortably inside the existing
@@ -1546,8 +1561,11 @@ reaches melee range still awards the normal kill bonus and costs no life.
 Builds on phase 1's `snowman-reached-player` event — only start this once
 phase 1 is working and verified.
 
-**Files:** `index.html` — new `snow-blind-overlay` component on the camera
-entity, `CONFIG`.
+**Files:** `index.html` (the camera entity markup gets the new component
+attribute); a new `js/components/snow-blind-overlay.js` (imported from
+`js/main.js`); `js/config.js` (new CONFIG values). The canvas-texture and
+easing helpers it reuses (points 2-3 below) live in `js/core/textures.js`
+and `js/core/math-utils.js` respectively.
 
 1. A camera-attached overlay plane, using the same head-locked-to-camera
    pattern `wave-hud`'s text entity already proves out, not world space.
