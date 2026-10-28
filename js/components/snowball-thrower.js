@@ -101,6 +101,12 @@ AFRAME.registerComponent('snowball-thrower', {
 
     sb.velocity.copy(direction).normalize().multiplyScalar(CONFIG.throwSpeed);
     sb.velocity.y += CONFIG.throwUpBias;
+
+    // Step 7: end-screen.js listens for this on the scene to know when
+    // to restart the run (any throw, while its post-credits freeze is
+    // active -- not an aimed hit on the panel itself, since requiring
+    // precise aim right after reading an end screen isn't the point).
+    this.el.emit('snowball-thrown');
   },
 
   deactivate: function (sb) {

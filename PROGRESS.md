@@ -22,10 +22,11 @@ not current.
 
 ## Status at a glance
 
-**Current step: Step 6 (sound + haptics) — not started.** Steps 1-5bis are
-done (desktop/Browser-pane verified; see the caveat below). Steps 9-11 are
-newly planned, not started, and not blocking 6-8 — pick them up whenever,
-each as its own branch + PR per `CLAUDE.md`.
+**Current step: Step 6 (sound + haptics) — not started.** Steps 1-5bis and
+7 are done (desktop/Browser-pane verified; see the caveat below). Step 7
+was picked up out of order (user request); 6 and 8 are still open. Steps
+9-11 are newly planned, not started, and not blocking 6-8 — pick them up
+whenever, each as its own branch + PR per `CLAUDE.md`.
 
 **Outstanding across every step since step 3:** none of this has been tried
 on a real Quest 2 headset yet — only desktop + the in-app Browser pane.
@@ -40,14 +41,15 @@ Keep that in mind before calling anything "done" in the VR-comfort sense.
 | 5 | Explosion + respawn | ✅ Done |
 | 5 bis | Wave/level director (multi-snowman waves, HUD) | ✅ Done |
 | 6 | Sound + haptics | ⬜ Not started |
-| 7 | HUD + i18n + accent check + in-VR credit line | ⬜ Not started |
+| 7 | HUD fix + welcome/credits screens + accent fallback | ✅ Done |
 | 8 | Performance pass + README/ASSETS.md + final docs grep | ⬜ Not started |
 | 9 | Desktop turn controls (rotate, not strafe, on Left/Right) | ⬜ Not started |
 | 10 | Per-difficulty snowman textures + bigger type-7 | ⬜ Not started |
 | 11 | Landscape progression after wave 5 / wave 10 | ⬜ Not started |
 | 12 | Lose condition: snowmen approach + touch the player | ⬜ Not started |
+| 13 | Scoring: accuracy bonus | ⬜ Not started |
 
-Steps 9-12 were scoped in a planning session on 2026-10-28; full
+Steps 9-13 were scoped in a planning session on 2026-10-28; full
 implementation detail for each lives inline in its own entry below in
 "Step-by-step status" — written so a cold session can execute directly from
 this file. Step 12 ships in two phases, in this order: a standard/softer
@@ -185,9 +187,10 @@ the step-by-step status.
    The user provided it (Sketchfab "Snowman" by alixor22). This is now the
    *one* non-CC0 asset — see `ASSETS.md` for the required credit text, which
    is already shown in two places: `ASSETS.md` and a small on-page corner
-   div in `index.html` (`#credit`). **Still owed:** an in-scene credit line
-   visible inside the headset itself (the on-page div isn't visible once in
-   VR) — planned for step 7 (HUD), don't forget it.
+   div in `index.html` (`#credit`). **Done as of step 7:** an in-scene
+   credit line visible inside the headset itself, shown on the end-of-run
+   `end-screen` panel (see step 7's notes) rather than continuously on
+   every snowman, per the user's explicit preference.
    - The model is a **single fused mesh** (Sketchfab's export merges
      everything) — no separate "eye", "crown", "head" sub-parts to animate
      individually. This changes how steps 2 and 4 need to work; see their
@@ -1230,15 +1233,273 @@ loopable. `CONFIG.volume` and `CONFIG.haptics` are already defined.
 </details>
 
 <details>
-<summary><strong>Step 7 — HUD + i18n + accent check (⬜ Not started)</strong></summary>
+<summary><strong>Step 7 — HUD fix + welcome/credits screens + accent fallback (✅ Done)</strong></summary>
 
-**Step 7 — HUD + i18n + accent check: not started.** Also: **add the in-VR
-CC-BY credit line here** (owed from step 1/model swap, see deviation #1
-above). `I18N` object already has the core strings; test á/é/ñ/¡ rendering
-in A-Frame's default MSDF font early in this step — fall back to a
-canvas-texture text plane if glyphs are missing (spec's own documented
-fallback).
+**Step 7: DONE.** Branched as `step-7-hud-i18n-credits`. Scope grew during
+the session past the original "HUD + i18n + accent check" brief, driven by
+user requests made at the start of the step (see below) — all folded into
+this one branch/PR rather than split further, since they're all small and
+touch the same new files.
 
+**What was asked for, going in:**
+1. Don't credit the CC-BY model on every snowman — instead, show an
+   end-of-run screen (after a modular wave count, default 10) crediting the
+   user ("Created by Vincentlc") and the CC-BY model, in-VR.
+2. The existing minimal `wave-hud` (step 5 bis) was reported as "buggy on
+   the Meta Quest — can see it in a corner... but not currently visible."
+3. (Added mid-session) A welcome/intro screen explaining the throw control
+   (trigger in VR, click on desktop) with a small controller-icon visual,
+   since nothing currently tells a new player what to do.
+
+**1. `wave-hud` fix.** Root cause: its position (`0.55 -0.35 -1.2`) put it
+about 25 degrees off-axis from center — past the zone each lens on a Quest
+2 renders crisply, so on-device it likely showed up jammed into the extreme
+corner of the visible image instead of reading as a corner HUD. Pulled in
+to `0.3 -0.22 -1.1` (~15-19 degrees off-axis, still clearly peripheral) and
+given a dark translucent backing card (now baked directly into its canvas
+texture, see the font/accent section below) for contrast against a bright
+sky/snow background. **Still not verified on a real headset** — the
+*reasoning* (lens sweet-spot geometry) is solid and matches the reported
+symptom, but the actual on-device feel is the real test, same as every
+other VR-comfort item in this project.
+
+**2. End-of-run credits screen.** New `CONFIG.creditsAfterWave = 10`
+(modular, per the ask — raise it for a longer run without touching other
+code). `wave-director.scheduleNextWave` now checks
+`(waveIndex + 1) >= CONFIG.creditsAfterWave` before scheduling the next
+wave; if reached, it emits `game-complete` (with the final score) instead
+and stops. New `end-screen` component (on `<a-scene>`) listens for that and
+shows a one-shot **world-space** panel — placed once, in front of wherever
+the player is looking at that moment (not head-locked like `wave-hud`), so
+it reads like a sign placed in the world rather than UI glued to the
+camera (avoids the "pasted to your eyeballs" discomfort a continuously
+head-locked full panel would cause). Shows final score, "Creado por
+Vincentlc" / "Created by Vincentlc", the CC-BY model credit (`MODEL_CREDIT`
+in `i18n.js`, shared/untranslated since it's a name/license string), and a
+restart hint — plus a brief snow-particle flourish (same one-shared-
+`THREE.Points`-pool pattern as `copito`'s snow-puff burst). **Restart, per
+the user's explicit ask ("freeze, but throw snow to restart, with message
+displayed to do it"):** `snowball-thrower.spawn()` now emits
+`snowball-thrown` on the scene on every throw; `end-screen` listens for
+that while its panel is active and emits `restart-game`, which
+`wave-director` picks up to reset score to 0 and restart at wave 1 — not an
+aimed hit on the panel itself, since requiring precise aim right after
+reading an end screen isn't the point.
+
+**3. Welcome/intro screen.** New `welcome-screen` component, same
+one-shot-world-space-panel pattern (factored into shared `vr-panel.js`, see
+below) — shows right after load, reusing the already-defined-but-previously
+-unused `I18N.instructionVR`/`instructionDesktop` strings (swapped live on
+`enter-vr`/`exit-vr`, since entering VR needs its own user gesture so
+vr-mode is usually still false the instant this first shows), plus a small
+canvas-drawn controller icon (`core/controller-icon.js`: tracking ring +
+handle silhouette + a highlighted/glowing trigger area + a curved "squeeze"
+arrow) since the user specifically asked for a mini visual of the control,
+not just text. Dismissed by the player's own first throw (same
+`snowball-thrown` event end-screen uses) — a natural "do the thing to
+continue" affordance — or after `CONFIG.welcomeAutoHideSeconds` (14s) if
+they never throw, so it never lingers forever.
+
+**Shared panel builder: `core/vr-panel.js`.** Once a second screen needed
+the exact same framed-card construction (teal border + dark backdrop +
+title/body text) as the first, pulled the builder out rather than
+duplicating it — `buildPanel(parentEl, opts)` returns `{panel, setTitle,
+setBody}`, and `placeFacingCamera(panelEl, camera, distance, yOffset)` is
+the shared one-shot "place this in front of the player and yaw it to face
+back" math both screens use (same `atan2(dx, dz)` convention
+`copito.updateFacing()` already established).
+
+**Accent/font fallback — the step's original "accent check" scope, and a
+real bug found doing it.** Checked á/é/ñ/¡ rendering in A-Frame's bundled
+MSDF font early, per the original plan note, by reading the font's own
+loaded glyph list live in-browser (`textComponent.currentFont.chars`):
+**confirmed zero accented/special glyphs at all** — á, é, í, ó, ú, ñ, ¡, ¿
+are all simply absent from `fonts/roboto`, not just visually off. Since
+this project's default language (`LANG = 'es'`) depends on exactly those
+characters throughout, A-Frame's `text` component isn't usable for *any*
+visible in-VR text here, not just the new strings — implemented the
+spec's own documented fallback (canvas-texture text plane) and applied it
+project-wide to every piece of in-VR text added or touched this step
+(`wave-hud`, `welcome-screen`, `end-screen`), via a new shared
+`core/canvas-text.js` (`createTextPlane`): draws with the real system font
+stack via `ctx.fillText` (full Unicode coverage) onto a canvas, applied as
+a texture on a plane mesh instead of `<a-entity text>`. Also does its own
+word-wrap at word boundaries for any line too wide for its canvas (found
+needed when testing the Spanish VR instruction sentence, which rendered at
+1001 of a 1024px canvas at the chosen font size — technically fit but with
+only ~11px of margin, too fragile against any font-metric difference on a
+real device/headset) while still honoring explicit `\n`s as hard breaks
+(used for blank-line spacing between the end screen's score/credit/restart
+blocks). **Not retrofitted onto every older piece of text in the file**
+(e.g. nothing in steps 1-6 used accented characters in a way that was
+user-reported as broken) — scoped to what this step actually touches/adds;
+a future session doing more i18n work should reuse `canvas-text.js` rather
+than `<a-entity text>` for anything in Spanish.
+
+**A second real bug found verifying the above, not just a font gap:**
+building `end-screen`/`welcome-screen`'s title+body as separate canvas-text
+meshes next to a separate backdrop/border `<a-plane>` (both children of one
+wrapper entity) initially rendered as a **blank card — text pixels were
+correctly drawn into their own canvases (confirmed via `getImageData`,
+non-zero alpha in the right regions) but never visible on screen.** Root
+cause, confirmed by inspecting the live THREE materials: A-Frame's
+`material` component leaves `depthWrite` at three.js's default (`true`)
+even on a semi-transparent plane (`opacity: 0.88`); the backdrop happened
+to end up drawn *after* the text meshes in the same `renderOrder` tier
+(draw order fell out of DOM/entity-attach timing — the raw text meshes were
+added to the group synchronously via `object3D.add()`, while the `a-plane`
+backdrop/border's own object3D attaches asynchronously, slightly later) —
+so the backdrop's near-opaque fill painted over the already-drawn text.
+Fixed with an explicit `renderOrder = 1` on every text/icon mesh that sits
+over a panel backdrop (backdrop/border stay at the default 0), forcing
+correct draw order regardless of attach timing — a standard three.js
+technique for exactly this "UI text over a UI backdrop" situation. Logged
+here in detail since this exact category (a semi-transparent A-Frame
+`material`-component plane with implicit `depthWrite: true` occluding a
+raw three.js object added alongside it) is likely to recur if more custom
+three.js content gets layered onto `a-plane`/`a-circle` backgrounds later
+in this project.
+
+**New config:** `creditsAfterWave`, `creditsPanelDistance/Width/Height`,
+`creditsParticleCount`, `welcomePanelDistance/Width/Height`,
+`welcomeAutoHideSeconds` — all in `js/config.js`. **New i18n keys:**
+`welcomeTitle`, `gameComplete`, `finalScore`, `createdBy`, `restartHint`
+(es/en) plus the shared `MODEL_CREDIT` constant, all in `js/i18n.js`. **New
+files:** `js/core/canvas-text.js`, `js/core/vr-panel.js`,
+`js/core/controller-icon.js`, `js/components/end-screen.js`,
+`js/components/welcome-screen.js`. **New event:** `snowball-thrown`
+(emitted by `snowball-thrower.spawn()` on every throw — used by both new
+screens' dismiss/restart triggers; harmless no-op for anything else that
+might listen later). **New entities on `<a-scene>`:** `end-screen
+welcome-screen` (alongside the existing `snowball-thrower wave-director`).
+
+**Tested this session** (Browser pane, same single-frame-render-on-demand
+constraint as every prior step — each screenshot forces one render):
+fresh-tab console clean across every reload; `welcome-screen` shows
+"¡Bienvenido!" + the (correctly accented) instruction text + the controller
+icon on load, dismisses cleanly on the first desktop click-throw, and
+visually auto-hides after `welcomeAutoHideSeconds` (confirmed this fired
+due to real elapsed wall-clock time across slow tool round-trips during
+testing, not a bug); `wave-director` scripted directly to the
+`creditsAfterWave` boundary (`waveIndex = 9` → `scheduleNextWave()`)
+correctly emits `game-complete` and *not* a wave 11; `end-screen` then
+shows "¡Juego completado!" / "Puntuación final: 1314" (both accented
+glyphs correct) / "Creado por Vincentlc" / the CC-BY model credit line /
+the restart hint, with the particle flourish firing; a throw afterward
+fires `restart-game`, confirmed `wave-director.waveIndex === 0` and
+`score === 0` immediately after, panel hidden, wave 1 restarted cleanly.
+Word-wrap verified directly (the long VR instruction sentence wraps to 2
+lines, both well inside the safe width, instead of nearly clipping at the
+canvas edge as it did before that fix). **Not yet tested: an actual Quest 2
+headset** — same outstanding item as every step since step 3, and
+*especially* relevant here since this step's whole premise (point 1) was a
+bug report made from real on-device use; the fix is reasoned from lens/FOV
+geometry, not re-confirmed on the hardware that reported it.
+
+**Step 7 follow-up round 1 (same session, after the user tried the above
+on their own machine):** two real rendering bugs found and fixed, plus one
+requested polish item:
+
+1. **Text was unreadable "aplastado" (squashed) vertically** on the
+   welcome panel's instruction line (not on `wave-hud`, which happened to
+   look fine). Root cause: a canvas-text plane's canvas pixel
+   width:height ratio has to match its `PlaneGeometry`'s physical
+   width:height ratio, or the texture gets non-uniformly stretched when
+   mapped onto the mesh -- `wave-hud`'s card accidentally already matched
+   (0.46/0.2 plane aspect vs ~0.46/0.2 canvas aspect, coincidence), but
+   `vr-panel.js`'s title/body planes used independently-guessed world
+   sizes and canvas pixel sizes that didn't correspond for a short, wide
+   body plane like welcome's. Fixed by rewriting `buildPanel` to *derive*
+   title/body/subtitle height from font size x a line-count budget, using
+   one shared width-derived pixel density for every plane in the panel --
+   the canvas and the mesh it's painted on are aspect-matched by
+   construction now, not by coincidence, so this class of bug can't recur
+   even as content/line-budgets change later. Panel height (`CONFIG.
+   creditsPanelHeight`/`welcomePanelHeight`, removed) is computed from
+   content now instead of being a separately-maintained guess.
+2. **Pixelated/blocky text up close**, reported from a real desktop
+   browser zoom, not just this project's own headless-pane testing. Cause:
+   the canvas backing each text/icon texture was sized for how big it
+   needed to be in *logical* pixels, not how many *texture texels* that
+   ends up being once magnified to the plane's displayed size -- not
+   enough texel density for a close look. Fixed with a
+   `RESOLUTION_SCALE` (2x) in `canvas-text.js`, applied internally (every
+   existing call site's canvasWidth/canvasHeight/fontSize/paddingX stay
+   the same "logical" numbers, scaling happens inside `createTextPlane`
+   itself) -- same fix mirrored in `controller-icon.js` (320px -> 640px
+   canvas) -- plus `texture.anisotropy = 8` on every such texture for
+   sharper off-angle viewing, since a world-space panel is rarely looked
+   at dead-on.
+3. **Welcome panel tagline, requested new:** a second line under the
+   title -- "Bienvenido a Snoworld Copito: el juego que desafía a los
+   monos de nieve" (the user's own phrasing; "monos de nieve" is Chilean
+   slang for snowmen, used deliberately, not a typo for "muñecos de
+   nieve"). `vr-panel.buildPanel` gained an optional subtitle region
+   (`subtitleMaxLines`, 0 by default so end-screen is unaffected) between
+   title and body, same content-driven sizing as the rest of the panel.
+   New `I18N.welcomeSubtitle` (es/en).
+- **Tested this session:** fresh-tab console clean across every reload;
+  welcome panel's instruction text confirmed no longer stretched
+  (screenshots compared before/after); the new subtitle wraps to 2 lines
+  and reads clearly at the new resolution; end-screen re-verified still
+  correct (score/credit/restart lines all legible, accents intact) after
+  the `buildPanel` rewrite. **Not yet tested: an actual Quest 2 headset**,
+  same outstanding item as the rest of this step.
+
+**Step 7 follow-up round 2 (same session, after the user asked how
+scoring works and what could improve):** three scoring changes, two
+implemented now, one deliberately deferred to step 13 (see that step's
+entry) per the user's own call ("me parece, pero quizás lo ponemos en
+progress como otra etapa").
+
+1. **Best score, persisted.** New `js/core/best-score.js`
+   (`getBestScore`/`updateBestScore`, `localStorage`, try/catch-guarded
+   the same way haptics are elsewhere in this project -- losing this is
+   cosmetic, not worth a hard failure over). `end-screen.show` now also
+   shows either "Mejor puntaje: N" or, if the run's final score beat the
+   stored best, "¡Nuevo récord!" instead. New `I18N.bestScore`/
+   `newRecord` (es/en). `bodyMaxLines` on the end-screen panel raised
+   8 -> 10 to fit the extra line without clipping (content-driven sizing
+   from the round-1 fix means this is the only number that needed
+   touching).
+2. **Wave-clear time bonus now scales with wave size**, instead of every
+   wave competing for the same flat 30-point/30-second budget regardless
+   of how many snowmen it threw at the player. `wave-director` now
+   remembers `waveSnowmanCount` at `startWave` (needed at
+   `scheduleNextWave` time, by which point `aliveThisWave` has already
+   decremented to 0) and grants `CONFIG.waveSoftTimerSecondsPerSnowman`
+   (5) free seconds plus `CONFIG.waveSoftTimerBonusPerSnowman` (10) max
+   bonus points *per snowman in that wave* -- a 7-snowman wave can now
+   earn up to 70 bonus points with a 35-second free window, instead of
+   being squeezed against the exact same 30-point/30-second budget as
+   wave 1's lone snowman. Replaces the old flat `CONFIG.
+   waveSoftTimerBonusMax`.
+3. **Accuracy bonus (reward a clean kill or a no-miss wave) -- not
+   implemented**, scoped instead as step 13 (its own entry further down
+   this file) per the user's explicit request to track it as a separate
+   future step rather than build it into this commit.
+- **Tested this session:** scripted a 7-snowman wave clear at 10 seconds
+  taken (under its new 35s free window) and confirmed the full 70-point
+  bonus applied (score math: 1234 base + 50 clear + 70 time = 1354,
+  matched exactly on the end screen); confirmed "¡Nuevo récord!" shows
+  after clearing `localStorage`'s stored best, and "Mejor puntaje: 1354"
+  shows (not the record line) on a second `show()` call with a lower
+  score; zero console errors throughout.
+
+**Step 7 follow-up round 3 (same session, small copy tweak):** welcome
+title changed from "¡Bienvenido!" to "Te damos la bienvenida" -- the user
+asked for gender-neutral phrasing (Spanish "bienvenido"/"bienvenida" is
+gender-inflected; "te damos la bienvenida" sidesteps that entirely, no
+-o/-a agreement needed). The subtitle no longer starts with "Bienvenido
+a..." for the same reason (and to not say it twice) -- it's pure
+tagline/branding now ("Snoworld Copito: el juego que desafía a los monos
+de nieve"), and its font size was bumped (34 -> 46) per the user's ask
+("un poco más grande"). English `welcomeTitle` ("Welcome!") was left as-is
+-- English doesn't have this gendered-adjective issue, so there was
+nothing to fix there. **Tested this session:** fresh-tab console clean;
+both lines render correctly at the new size with no clipping (title wraps
+to 2 lines, same as before); end-screen re-confirmed unaffected (it never
+used the subtitle region).
 
 </details>
 
@@ -1595,6 +1856,49 @@ manual-event-emit technique already used to test `snowman-hit`/
 `snowman-destroyed` in earlier steps) and confirm the overlay fades in and
 back out over the camera view without blocking the HUD text or making the
 scene unreadable at peak opacity.
+
+</details>
+
+<details>
+<summary><strong>Step 13 — scoring: accuracy bonus (⬜ Not started)</strong></summary>
+
+**Scoped 2026-10-28, not yet implemented** (requested alongside the step 7
+scoring improvements below, but deliberately deferred to its own step
+rather than folded in -- the user's call: "me parece [buena idea], pero
+quizás lo ponemos en progress como otra etapa"). Idea: reward *accuracy*,
+not just survival/speed -- right now a miss costs nothing (see step 4's
+snowball packing/landing system, misses just pile up on the ground), so a
+player spamming throws scores identically to one aiming carefully, besides
+the wave-clear time bonus (step 7) which only rewards overall wave speed,
+not per-target precision.
+
+Two options floated, not yet chosen between:
+
+1. **Per-snowman "clean kill" bonus**: extra points if a snowman was
+   destroyed without any snowball fired at it missing (tracked per
+   registered snowman -- `copitoRegistry`, see `js/registry/
+   copito-registry.js`, already has one entry per active snowman;
+   `snowball-thrower.findHitSnowman` already knows which snowman a given
+   flying snowball was aimed near when it misses, though "aimed near"
+   vs "truly aimed at that one" would need a definition for multi-snowman
+   waves where more than one target is in a throw's rough path).
+2. **Wave-level "no misses" streak**: track total throws vs total hits for
+   the whole wave (simpler to implement -- `snowball-thrower` already
+   knows every throw via the `snowball-thrown` event added in step 7, and
+   every hit via `snowball-hit`), bonus if the ratio is 100% (or above some
+   threshold) when the wave clears.
+
+Option 2 is simpler and doesn't need per-snowman attribution, so it's the
+likely starting point unless the user asks for the more granular per-kill
+version. Either way: new `CONFIG` constant(s) for the bonus amount, wired
+into `wave-director`'s existing `onSnowmanDestroyed`/`scheduleNextWave`
+scoring path (same place the step 7 per-kill and time bonuses live), and a
+new counter somewhere tracking throws-vs-hits per wave (reset in
+`startWave`). Should show up on the end screen's score breakdown
+eventually too, once there is one (today's end screen just shows one
+final total, see step 7 -- if accuracy bonus lands, consider breaking the
+total into separate score-breakdown lines there, since multiple bonus
+sources are getting hard to infer from one number).
 
 </details>
 

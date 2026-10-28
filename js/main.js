@@ -22,4 +22,6 @@ import './components/snowball-thrower.js';
 import './components/trajectory-preview.js';
 import './components/wave-director.js';
 import './components/wave-hud.js';
+import './components/end-screen.js';
+import './components/welcome-screen.js';
 import './components/snowman/snowman-component.js';

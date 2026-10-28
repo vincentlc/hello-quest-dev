@@ -38,6 +38,10 @@ AFRAME.registerComponent('wave-director', {
 
     this.el.addEventListener('snowman-destroyed', (evt) => this.onSnowmanDestroyed(evt));
     this.el.addEventListener('snowman-cleared', (evt) => this.onSnowmanCleared(evt));
+    // end-screen.js re-emits this once a snowball is thrown while the
+    // post-credits freeze is active (see scheduleNextWave below) --
+    // restart is just "start over at wave 1 with the score reset".
+    this.el.addEventListener('restart-game', () => this.restart());
 
     // Deferred a macrotask past init (not called directly here):
     // startWave appends new DOM entities (the pool, see
@@ -94,6 +98,10 @@ AFRAME.registerComponent('wave-director', {
     var points = pickSpawnPoints(waveCfg.count, origin, forward);
 
     this.aliveThisWave = waveCfg.count;
+    // Remembered for scheduleNextWave's time-bonus calc below --
+    // aliveThisWave itself is decremented to 0 by the time that runs,
+    // so the snowman count needs its own copy.
+    this.waveSnowmanCount = waveCfg.count;
     for (var i = 0; i < waveCfg.count; i++) {
       var type = waveCfg.types[i % waveCfg.types.length];
       var entry = this.getPoolEntity(type);
@@ -137,13 +145,41 @@ AFRAME.registerComponent('wave-director', {
     if (entry) entry.inUse = false;
   },
 
+  // Soft time bonus, scaled to the wave's own size (step 7 improvement
+  // -- originally a flat budget regardless of snowman count, which
+  // unfairly squeezed later/bigger waves against the same clock as
+  // wave 1's single snowman). Each snowman in the wave grants
+  // `waveSoftTimerSecondsPerSnowman` seconds of "free" time before the
+  // bonus starts decaying, and raises the max bonus pool by
+  // `waveSoftTimerBonusPerSnowman` -- a 7-snowman wave can earn up to
+  // 7x a 1-snowman wave's bonus, with proportionally more time to earn
+  // it in, instead of competing for the exact same fixed pool/window.
   scheduleNextWave: function () {
     var secondsTaken = (performance.now() - this.waveStartAt) / 1000;
-    var softBonus = Math.max(0, CONFIG.waveSoftTimerBonusMax - secondsTaken * CONFIG.waveSoftTimerDecayPerSecond);
+    var allowedSeconds = CONFIG.waveSoftTimerSecondsPerSnowman * this.waveSnowmanCount;
+    var maxBonus = CONFIG.waveSoftTimerBonusPerSnowman * this.waveSnowmanCount;
+    var overTime = Math.max(0, secondsTaken - allowedSeconds);
+    var softBonus = Math.max(0, maxBonus - overTime * CONFIG.waveSoftTimerDecayPerSecond);
     this.score += CONFIG.waveClearBonus + softBonus;
     console.log('[wave-director] wave ' + (this.waveIndex + 1) + ' cleared, score ' + Math.round(this.score));
     this.emitState();
+
+    // Step 7: once the configured run length is cleared, freeze instead
+    // of letting getWaveConfig keep generating waves forever -- hand off
+    // to end-screen.js (listens for this same event on this.el) to show
+    // the in-VR credits panel. Nothing here assumes end-screen.js is
+    // actually present/listening, so this still degrades safely (game
+    // just stops spawning) if that component is ever removed.
     var nextIndex = this.waveIndex + 1;
+    if (nextIndex >= CONFIG.creditsAfterWave) {
+      this.el.emit('game-complete', { score: this.score });
+      return;
+    }
     setTimeout(() => this.startWave(nextIndex), CONFIG.waveIntermissionDelay * 1000);
+  },
+
+  restart: function () {
+    this.score = 0;
+    this.startWave(0);
   }
 });
