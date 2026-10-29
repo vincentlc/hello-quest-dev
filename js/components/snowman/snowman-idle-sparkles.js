@@ -24,8 +24,8 @@ export default {
     for (var i = 0; i < n; i++) {
       this.sparkleAngles[i] = Math.random() * Math.PI * 2;
       this.sparkleSpeeds[i] = 0.15 + Math.random() * 0.25;
-      this.sparkleRadii[i] = 0.55 + Math.random() * 0.45;
-      this.sparkleHeights[i] = 0.15 + Math.random() * 1.3;
+      this.sparkleRadii[i] = (0.55 + Math.random() * 0.45) * this.sizeScale;
+      this.sparkleHeights[i] = (0.15 + Math.random() * 1.3) * this.sizeScale;
       this.sparklePhases[i] = Math.random() * Math.PI * 2;
     }
 

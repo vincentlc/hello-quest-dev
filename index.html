@@ -33,6 +33,10 @@
       <img id="ground2" src="assets/sky/ground2.jpg">
       <img id="sky3" src="assets/sky/sky3.jpg">
       <img id="ground3" src="assets/sky/ground3.jpg">
+      <img id="copitoTextureT1" src="assets/models/copito/textures/mueco_de_nieve_t1.png">
+      <img id="copitoTextureT3" src="assets/models/copito/textures/mueco_de_nieve_t3.png">
+      <img id="copitoTextureT5" src="assets/models/copito/textures/mueco_de_nieve_t5.png">
+      <img id="copitoTextureT7" src="assets/models/copito/textures/mueco_de_nieve_t7.png">
       <a-asset-item id="copitoModel" src="assets/models/copito/scene.gltf"></a-asset-item>
     </a-assets>
 
@@ -94,7 +98,8 @@
     <a-entity id="rightHand" meta-touch-controls="hand: right" controller-aim
               trajectory-preview="source: hand"></a-entity>
 
-    <a-entity camera position="0 1.6 0" look-controls wasd-controls
+    <a-entity camera position="0 1.6 0" look-controls
+              wasd-controls="adEnabled: false" desktop-turn
               trajectory-preview="source: desktop" wave-hud></a-entity>
   </a-scene>
 

@@ -11,7 +11,7 @@ Every non-code asset used in this demo, where it came from, and its license. CC0
 **Required credit** (must be shown wherever this is shared, per the license):
 > This work is based on "Snowman" (https://sketchfab.com/3d-models/snowman-7d683ce4a9c54f158cc73d65a16a9a29) by alixor22 (https://sketchfab.com/alixor22) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 
-Provided by the user as a CC-BY download (originally FBX + a separate glTF export); only the glTF export is used (`scene.gltf`/`scene.bin`, 1 mesh, ~8,900 triangles, 3 PBR textures: base color, metallic/roughness, normal). This replaces the original hand-built primitive snowman design from earlier in the build. Single fused mesh, so later steps (idle animation, hit reactions) treat it as one rigid body rather than animating individual sub-parts (eyes, crown, etc. aren't separately addressable the way the primitive version was).
+Provided by the user as a CC-BY download (originally FBX + a separate glTF export); only the glTF export is used (`scene.gltf`/`scene.bin`, 1 mesh, ~8,900 triangles, 3 PBR textures: base color, metallic/roughness, normal). The type-3/5/7 base-color variants in the same texture folder are derived recolors of that original texture, used as difficulty cues. This replaces the original hand-built primitive snowman design from earlier in the build. Single fused mesh, so later steps (idle animation, hit reactions) treat it as one rigid body rather than animating individual sub-parts (eyes, crown, etc. aren't separately addressable the way the primitive version was).
 
 Internal in-code naming ("Copito") is kept as a project nickname only, unrelated to this asset's own title.
 
