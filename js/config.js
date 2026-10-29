@@ -273,10 +273,9 @@ export var CONFIG = {
     forestBirdCall: 'assets/audio/fio-fio-xc249514.ogg',
     footstepDistance: 0.48,
     footstepMinInterval: 320,
-    birdFirstDelayMin: 7000,
-    birdFirstDelayMax: 19000,
-    birdRepeatDelayMin: 30000,
-    birdRepeatDelayMax: 65000
+    birdCallStartWave: 6,
+    birdRoundDelayMin: 5000,
+    birdRoundDelayMax: 20000
   },
   // Sound volumes 0 to 1. Keep environmental and snow sounds subtle.
   volume: {

@@ -11,7 +11,8 @@ bright hat colors with the required hit count painted directly onto each
 hat; type 7 is twice the normal size. Tougher snowmen can also appear in the
 fog, and kills show their point award above the snowman. Sound is sparse:
 snow movement and impacts play as short effects, with occasional bird calls
-after the forest landscapes appear. Other planned steps are tracked in
+at random moments from round 6 onward, alternating between the player's left
+and right sides. Other planned steps are tracked in
 `PROGRESS.md`.
 
 ## Run it on desktop (Chrome)

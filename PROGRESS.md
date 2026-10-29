@@ -1230,10 +1230,11 @@ more requests:
 Audio now has no continuous noise bed or respawn chime. Short, subdued
 snow-texture sounds cover walking, throws, impacts, and the snowman's soft
 breakup; footsteps are triggered by actual horizontal player movement.
-Fio-fio calls are spatialized and randomized after landscape changes at
-rounds 5 and 9, then recur irregularly only in those later landscapes. The
-recording is by Niels Krabbe (Xeno-canto XC249514), CC BY-SA 4.0, and was
-recorded in Ecuador rather than Chile; see `ASSETS.md`. Audio unlocks on
+Fio-fio calls are spatialized at random moments during each round from round 6
+onward, independently of landscape transitions, alternating between the
+player's left and right sides. The recording is by Niels Krabbe (Xeno-canto
+XC249514), CC BY-SA 4.0, and was recorded in Ecuador rather than Chile; see
+`ASSETS.md`. Audio unlocks on
 the first user gesture. Pressing keyboard A or the right controller's A
 button toggles sound; the muted/unmuted Spanish hint sits below the HUD.
 Keyboard turning stays on the arrow keys so A has one unambiguous action.

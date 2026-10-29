@@ -38,7 +38,9 @@ The second sky variant was downloaded as `snowy_park_01_4k.hdr`; the third now u
 The fio-fio sample is a field recording made in Tungurahua, Ecuador, not
 southern Chile. It is converted from the original MP3 to mono Ogg at 22.05
 kHz for smaller download size. Calls are played as short, spatialized clips
-at irregular intervals only after the forest/park landscapes appear.
+at a random moment in each round starting with round 6, alternating between
+the player's left and right sides. The calls are not tied to landscape
+transitions.
 Footsteps, snow impacts, the throw whoosh, and the soft snow breakup are
 short Web Audio textures; there is no continuous generated-noise ambience.
 

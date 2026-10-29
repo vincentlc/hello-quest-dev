@@ -23,9 +23,13 @@ AFRAME.registerComponent('sound-manager', {
     this.birdCallLoadPromise = null;
     this.birdSource = null;
     this.birdTimer = null;
-    this.landscapeIndex = 0;
+    this.currentWaveNumber = 0;
+    this.waveScheduleVersion = 0;
+    this.nextBirdSide = -1;
     this.cameraPosition = new AFRAME.THREE.Vector3();
     this.cameraForward = new AFRAME.THREE.Vector3();
+    this.cameraQuaternion = new AFRAME.THREE.Quaternion();
+    this.birdDirection = new AFRAME.THREE.Vector3();
     this.lastFootstepPosition = new AFRAME.THREE.Vector3();
     this.hasFootstepPosition = false;
     this.lastFootstepAt = -Infinity;
@@ -45,7 +49,7 @@ AFRAME.registerComponent('sound-manager', {
       if (detail.hitCount >= detail.hitsToExplode) this.playSnowFall();
       else this.playSnowCrunch(CONFIG.volume.hit);
     };
-    this.onLandscapeChanged = (evt) => this.changeLandscape(evt.detail.landscapeIndex);
+    this.onWaveStateChanged = (evt) => this.changeWave(evt.detail.waveIndex + 1);
     this.onKeyDown = (evt) => {
       if (evt.code !== 'KeyA' || evt.repeat || this.isEditableTarget(evt.target)) return;
       evt.preventDefault();
@@ -56,7 +60,7 @@ AFRAME.registerComponent('sound-manager', {
     this.el.addEventListener('snowball-thrown', this.onSnowballThrown);
     this.el.addEventListener('snowball-hit-registered', this.onSnowballHit);
     this.el.addEventListener('snowman-hit', this.onSnowmanHit);
-    this.el.addEventListener('landscape-changed', this.onLandscapeChanged);
+    this.el.addEventListener('wave-state-changed', this.onWaveStateChanged);
     window.addEventListener('keydown', this.onKeyDown);
 
     this.onSceneLoaded = () => this.attachController();
@@ -115,7 +119,9 @@ AFRAME.registerComponent('sound-manager', {
   },
 
   onAudioReady: function () {
-    if (this.soundEnabled && this.landscapeIndex > 0) this.scheduleBirdCall();
+    if (this.soundEnabled && this.currentWaveNumber >= CONFIG.sound.birdCallStartWave) {
+      this.scheduleBirdCall();
+    }
   },
 
   updateMasterGain: function () {
@@ -220,14 +226,13 @@ AFRAME.registerComponent('sound-manager', {
     }
   },
 
-  changeLandscape: function (landscapeIndex) {
-    this.landscapeIndex = landscapeIndex;
+  changeWave: function (waveNumber) {
+    if (waveNumber === this.currentWaveNumber) return;
+    this.currentWaveNumber = waveNumber;
+    this.waveScheduleVersion++;
     this.stopBirdCalls();
-    if (this.soundEnabled && this.audioContext && landscapeIndex > 0) {
-      this.scheduleBirdCall(randomBetween(
-        CONFIG.sound.birdFirstDelayMin,
-        CONFIG.sound.birdFirstDelayMax
-      ));
+    if (waveNumber >= CONFIG.sound.birdCallStartWave && this.soundEnabled && this.audioContext) {
+      this.scheduleBirdCall();
     }
   },
 
@@ -259,20 +264,20 @@ AFRAME.registerComponent('sound-manager', {
 
   scheduleBirdCall: function (delay) {
     if (this.birdTimer !== null || !this.soundEnabled ||
-        !this.audioContext || this.landscapeIndex === 0) return;
+        !this.audioContext || this.currentWaveNumber < CONFIG.sound.birdCallStartWave) return;
 
     var wait = delay === undefined
-      ? randomBetween(CONFIG.sound.birdRepeatDelayMin, CONFIG.sound.birdRepeatDelayMax)
+      ? randomBetween(CONFIG.sound.birdRoundDelayMin, CONFIG.sound.birdRoundDelayMax)
       : delay;
+    var scheduledWave = this.currentWaveNumber;
+    var scheduleVersion = this.waveScheduleVersion;
     this.birdTimer = setTimeout(() => {
       this.birdTimer = null;
       this.loadBirdCall().then((buffer) => {
-        if (!buffer || !this.soundEnabled || this.landscapeIndex === 0) return;
+        if (!buffer || !this.soundEnabled ||
+            scheduledWave !== this.currentWaveNumber ||
+            scheduleVersion !== this.waveScheduleVersion) return;
         this.playBirdCall(buffer);
-        this.scheduleBirdCall(randomBetween(
-          CONFIG.sound.birdRepeatDelayMin,
-          CONFIG.sound.birdRepeatDelayMax
-        ));
       });
     }, wait);
   },
@@ -286,8 +291,12 @@ AFRAME.registerComponent('sound-manager', {
     }
 
     var camera = this.el.camera;
-    if (camera) camera.getWorldPosition(this.cameraPosition);
-    var angle = Math.random() * Math.PI * 2;
+    if (!camera) throw new Error('[sound-manager] A camera is required to spatialize bird calls.');
+    camera.getWorldPosition(this.cameraPosition);
+    var side = this.nextBirdSide;
+    this.nextBirdSide *= -1;
+    camera.getWorldQuaternion(this.cameraQuaternion);
+    var direction = this.birdDirection.set(side, 0, 0).applyQuaternion(this.cameraQuaternion);
     var distance = randomBetween(9, 15);
     var panner = context.createPanner();
     panner.panningModel = 'HRTF';
@@ -295,8 +304,8 @@ AFRAME.registerComponent('sound-manager', {
     panner.refDistance = 1;
     panner.rolloffFactor = 0.25;
     panner.maxDistance = 40;
-    var x = this.cameraPosition.x + Math.cos(angle) * distance;
-    var z = this.cameraPosition.z + Math.sin(angle) * distance;
+    var x = this.cameraPosition.x + direction.x * distance;
+    var z = this.cameraPosition.z + direction.z * distance;
     if (panner.positionX) {
       panner.positionX.value = x;
       panner.positionY.value = this.cameraPosition.y + 1;
@@ -342,7 +351,7 @@ AFRAME.registerComponent('sound-manager', {
     this.el.removeEventListener('snowball-thrown', this.onSnowballThrown);
     this.el.removeEventListener('snowball-hit-registered', this.onSnowballHit);
     this.el.removeEventListener('snowman-hit', this.onSnowmanHit);
-    this.el.removeEventListener('landscape-changed', this.onLandscapeChanged);
+    this.el.removeEventListener('wave-state-changed', this.onWaveStateChanged);
     this.el.removeEventListener('loaded', this.onSceneLoaded);
     window.removeEventListener('keydown', this.onKeyDown);
     if (this.rightHand) this.rightHand.removeEventListener('abuttondown', this.onControllerA);
