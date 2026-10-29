@@ -1,6 +1,6 @@
 # Assets
 
-Every non-code asset used in this demo, where it came from, and its license. CC0 by default, with one explicit CC-BY exception below (the 3D model), used by the user's choice and credited as its license requires.
+Every non-code asset used in this demo, where it came from, and its license. Licenses are listed per asset; required attribution is included below.
 
 ## 3D model
 
@@ -31,4 +31,18 @@ The second sky variant was downloaded as `snowy_park_01_4k.hdr`; the third now u
 
 ## Sound
 
-Not sourced yet (step 6 of the build). Plan: Kenney Impact Sounds pack (CC0) for hit thuds/cracks/shatter, Freesound CC0 clip for wind ambience, and a few effects (throw whoosh, respawn chime) synthesized directly with the Web Audio API since no suitable CC0 sample was found quickly for those. Will be filled in with exact files/authors/links once downloaded.
+| File | Source | Author | License |
+|---|---|---|---|
+| `assets/audio/fio-fio-xc249514.ogg` | [Wikimedia Commons recording](https://commons.wikimedia.org/wiki/File:Elaenia_albiceps_-_White-crested_Elaenia_XC249514.mp3) ([Xeno-canto XC249514](https://xeno-canto.org/249514)) | Niels Krabbe | CC BY-SA 4.0 |
+
+The fio-fio sample is a field recording made in Tungurahua, Ecuador, not
+southern Chile. It is converted from the original MP3 to mono Ogg at 22.05
+kHz for smaller download size. Calls are played as short, spatialized clips
+at irregular intervals only after the forest/park landscapes appear.
+Footsteps, snow impacts, the throw whoosh, and the soft snow breakup are
+short Web Audio textures; there is no continuous generated-noise ambience.
+
+**Attribution:** "White-crested Elaenia (Elaenia albiceps), XC249514" by
+Niels Krabbe, via Xeno-canto/Wikimedia Commons, licensed under
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Converted
+to mono Ogg at 22.05 kHz.

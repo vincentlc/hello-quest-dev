@@ -268,14 +268,23 @@ export var CONFIG = {
   scorePopupDuration: 1.4,
   scorePopupHeight: 0.55,
 
-  // Sound volumes 0 to 1 (step 6)
+  // Sound settings (step 6)
+  sound: {
+    forestBirdCall: 'assets/audio/fio-fio-xc249514.ogg',
+    footstepDistance: 0.48,
+    footstepMinInterval: 320,
+    birdFirstDelayMin: 7000,
+    birdFirstDelayMax: 19000,
+    birdRepeatDelayMin: 30000,
+    birdRepeatDelayMax: 65000
+  },
+  // Sound volumes 0 to 1. Keep environmental and snow sounds subtle.
   volume: {
-    throw: 0.5,
-    hit: 0.6,
-    crack: 0.6,
-    explosion: 0.8,
-    respawn: 0.6,
-    ambience: 0.25
+    throw: 0.12,
+    hit: 0.22,
+    explosion: 0.16,
+    footstep: 0.2,
+    forestBird: 0.25
   },
 
   // Haptic pulses: [intensity 0 to 1, duration ms] (step 6)

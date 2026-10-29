@@ -60,9 +60,11 @@ AFRAME.registerComponent('landscape-director', {
 
     if (this.transitionStartedAt !== null) {
       this.pendingLandscapeIndex = landscapeIndex;
+      this.transitionWaveIndex = waveIndex;
       return;
     }
     this.pendingLandscapeIndex = landscapeIndex;
+    this.transitionWaveIndex = waveIndex;
     this.transitionStartedAt = performance.now();
     if (this.fadeOverlay) this.fadeOverlay.visible = true;
   },
@@ -117,6 +119,10 @@ AFRAME.registerComponent('landscape-director', {
     this.fadeMaterial.opacity = 0;
     this.fadeOverlay.visible = false;
     this.transitionStartedAt = null;
+    this.el.emit('landscape-changed', {
+      landscapeIndex: this.currentLandscapeIndex,
+      waveIndex: this.transitionWaveIndex
+    });
   },
 
   applyLandscape: function (landscape) {
