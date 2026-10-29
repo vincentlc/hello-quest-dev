@@ -1882,7 +1882,9 @@ alongside the points awarded, so a zero can be understood as no successful
 hits rather than an unexplained score. Spanish uses "Ronda" throughout the
 HUD and displays progress as `Ronda N/10`. Each cleared round also shows a
 gender-neutral, round-specific message with a short burst of cube particles.
-The messages currently avoid Chilean slang pending the user's copy review.
+The user approved "bacán", "filete", and "pulento" for the Spanish copy;
+they are used about the player's progress, work, and the challenge, not to
+gender the player.
 
 </details>
 
