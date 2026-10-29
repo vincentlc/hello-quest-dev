@@ -9,13 +9,13 @@ function getTransitionThresholds(waveCount, landscapeCount) {
   ratio += (CONFIG.landscapeTransitionRatios.secondAt20Waves - ratio) * ratioProgress;
 
   var desiredThresholds = [
-    Math.round(waveCount * CONFIG.landscapeTransitionRatios.first),
-    Math.round(waveCount * ratio)
+    Math.ceil(waveCount * CONFIG.landscapeTransitionRatios.first) - 1,
+    Math.ceil(waveCount * ratio) - 1
   ];
   var thresholds = [];
   for (var i = 0; i < transitionCount; i++) {
-    var minimum = i === 0 ? 1 : thresholds[i - 1] + 1;
-    var maximum = waveCount - (transitionCount - i);
+    var minimum = i === 0 ? 0 : thresholds[i - 1] + 1;
+    var maximum = waveCount - (transitionCount - i) - 1;
     thresholds.push(Math.max(minimum, Math.min(maximum, desiredThresholds[i])));
   }
   return thresholds;

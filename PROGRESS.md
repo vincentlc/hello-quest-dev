@@ -26,7 +26,9 @@ not current.
 7 and 9 are done (desktop/Browser-pane verified; see the caveat below).
 Step 7 was picked up out of order (user request); 6 and 8 are still open.
 Step 10's implementation is complete, with rendered visual verification
-still pending. Steps 11 and 12 remain open. Step 13 is implemented.
+still pending. Step 11's adaptive transitions and assets are implemented;
+rendered verification is pending. Step 12 remains open. Step 13 is
+implemented.
 These steps do not block 6-8 — pick them up whenever, each as its own
 branch + PR per `CLAUDE.md`.
 
@@ -47,7 +49,7 @@ Keep that in mind before calling anything "done" in the VR-comfort sense.
 | 8 | Performance pass + README/ASSETS.md + final docs grep | ⬜ Not started |
 | 9 | Desktop turn controls (rotate, not strafe, on Left/Right) | ✅ Done |
 | 10 | Per-difficulty snowman textures + bigger type-7 + fog spawns | ✅ Implemented; rendered verification pending |
-| 11 | Adaptive landscape progression | ✅ Done |
+| 11 | Adaptive landscape progression | ✅ Implemented; rendered verification pending |
 | 12 | Lose condition: snowmen approach + touch the player | ⬜ Not started |
 | 13 | Scoring: accuracy bonus | ✅ Implemented |
 
@@ -1686,19 +1688,20 @@ real Quest 2.
 <summary><strong>Step 11 — adaptive landscape progression (✅ Implemented; rendered verification pending)</strong></summary>
 
 The scene now has three landscape entries. `snowy_park_01_4k.hdr` from
-Poly Haven becomes landscape 2 (`sky2.jpg`/`ground2.jpg`); `snowy_hillside_4k.hdr`
-becomes landscape 3 (`sky3.jpg`/`ground3.jpg`). The HDRIs were tone-mapped
-to 4096x2048 JPGs with OpenCV Reinhard (gamma 2.2); each ground is a 650x650
-foreground-snow crop from its panorama. Sources and CC0 licenses are in
-`ASSETS.md`.
+Poly Haven becomes landscape 2 (`sky2.jpg`/`ground2.jpg`); the initial
+landscape 3 conversion from `snowy_hillside_4k.hdr` was visibly washed out
+and has been replaced by `snowy_forest_path_01_4k.hdr`
+(`sky3.jpg`/`ground3.jpg`). The HDRIs are tone-mapped to 4096x2048 JPGs
+with OpenCV Reinhard (gamma 2.2); each ground is a 650x650 foreground-snow
+crop from its panorama. Sources and CC0 licenses are in `ASSETS.md`.
 
 `landscape-director` listens to `wave-state-changed` and updates the sky,
-ground, fog, and sky rotation. For the default 10-wave run, the zero-based
-thresholds are `[5, 9]`, so the new landscapes appear as waves 6 and 10
-start. The first transition stays at 50% of the run; the second moves from
-90% at 10 waves to 70% at 20 waves, interpolating between those lengths.
-Changing the run length keeps thresholds ordered and within the available
-run.
+ground, fog, and sky rotation. Threshold ratios map to the human-readable
+wave number (then convert to a zero-based index), so the default 10-wave
+run changes landscapes as levels 5 and 9 start. The first transition stays
+at 50% of the run; the second moves from 90% at 10 waves to 70% at 20 waves,
+interpolating between those lengths. Changing the run length keeps
+thresholds ordered and within the available run.
 
 **Still needed:** rendered verification of both landscape swaps and their
 sky/ground/fog seams; tune rotations and fog if needed. No real Quest 2

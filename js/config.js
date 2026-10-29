@@ -192,7 +192,8 @@ export var CONFIG = {
   waveDestroyBonusPerLife: 10,   // score per "life" (hitsToExplode) on a kill -- a type-7 kill is worth more than a type-1
   // Landscape changes are distributed across the configured run. The
   // first change stays at 50%; the second moves from 90% at 10 waves to
-  // 70% at 20 waves, so the current run changes on wave indices 5 and 9.
+  // 70% at 20 waves. Threshold ratios identify the wave number to start
+  // (not the zero-based index), so 10 waves changes on levels 5 and 9.
   landscapeTransitionRatios: {
     first: 0.5,
     secondAt10Waves: 0.9,
@@ -218,7 +219,7 @@ export var CONFIG = {
       skyAsset: '#sky3',
       groundAsset: '#ground3',
       rotation: '0 120 0',
-      fog: { type: 'linear', color: '#D6D2D2', near: 4.5, far: 7.9 }
+      fog: { type: 'linear', color: '#6B727D', near: 4.5, far: 7.9 }
     }
   ],
   // Wave-clear and time bonuses start at wave 5.
