@@ -8,13 +8,13 @@ lessons learned, and step-by-step status; this file is just process rules.
 Every new step or feature gets its own branch and pull request. Never commit
 new development straight to `main`.
 
-- Before starting a step's work, create a branch off `main` (e.g.
-  `step-4-hit-reactions`, `fix-trajectory-dots`).
-- First refresh from GitHub: run `git fetch origin`, then update local
-  `main` with `git pull --ff-only origin main` before creating the feature
-  branch. Never branch from a stale local `main`. When resuming an existing
-  feature branch, fetch first and integrate the latest `origin/main` when
-  it has advanced.
+- Before creating a new feature branch, always refresh `main` from GitHub:
+  run `git fetch origin`, switch to `main`, and run
+  `git pull --ff-only origin main`. Then create the feature branch from
+  the updated `main` (or directly from `origin/main`). Never branch from
+  a stale local `main`, even if a local `main` branch already exists.
+- When resuming an existing feature branch, fetch first and integrate the
+  latest `origin/main` when it has advanced.
 - Commit the work on that branch as it's completed.
 - Push the branch and open a pull request against `main` (use `gh pr create`
   if the `gh` CLI is available; otherwise push the branch and hand the user

@@ -188,8 +188,43 @@ export var CONFIG = {
   waveArcFullDeg: 360,           // full circle -- can spawn behind the player
   waveArcFullThreshold: 5,       // snowman count at/above which the full-circle arc kicks in
   waveMaxConcurrentSnowmen: 8,   // cap once past the authored WAVE_TABLE (see getWaveConfig)
-  waveIntermissionDelay: 2.5,    // seconds of calm between a wave clearing and the next starting
+  waveIntermissionDelay: 2.5,    // full intermission duration, reached by wave 5
+  waveIntermissionStartDelay: 1, // shorter pause after the opening wave
+  waveIntermissionFullDelayWave: 5, // keep the full delay from this wave onward
   waveDestroyBonusPerLife: 10,   // score per "life" (hitsToExplode) on a kill -- a type-7 kill is worth more than a type-1
+  // Landscape changes are distributed across the configured run. The
+  // first change stays at 50%; the second moves from 90% at 10 waves to
+  // 70% at 20 waves. Threshold ratios identify the wave number to start
+  // (not the zero-based index), so 10 waves changes on levels 5 and 9.
+  landscapeTransitionRatios: {
+    first: 0.5,
+    secondAt10Waves: 0.9,
+    secondAt20Waves: 0.7
+  },
+  // Add entries for new photos here after adding their <img> assets in
+  // index.html. Each entry supplies sky/ground asset selectors, fog, and
+  // rotation; the first entry mirrors the scene's existing look.
+  landscapes: [
+    {
+      skyAsset: '#sky',
+      groundAsset: '#groundTex',
+      rotation: '0 120 0',
+      fog: { type: 'linear', color: '#aab0b8', near: 4.5, far: 7.9 }
+    },
+    {
+      skyAsset: '#sky2',
+      groundAsset: '#ground2',
+      rotation: '0 120 0',
+      fog: { type: 'linear', color: '#9CACC6', near: 4.5, far: 7.9 }
+    },
+    {
+      skyAsset: '#sky3',
+      groundAsset: '#ground3',
+      rotation: '0 120 0',
+      fog: { type: 'linear', color: '#6B727D', near: 4.5, far: 7.9 }
+    }
+  ],
+  // Wave-clear and time bonuses start at wave 5.
   waveBonusStartWave: 5,
   waveClearBonus: 50,
   waveClearBonusIncreasePerWave: 10,

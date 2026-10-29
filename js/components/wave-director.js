@@ -289,7 +289,11 @@ AFRAME.registerComponent('wave-director', {
       this.el.emit('game-complete', { score: this.score });
       return;
     }
-    setTimeout(() => this.startWave(nextIndex), CONFIG.waveIntermissionDelay * 1000);
+    var rampDuration = Math.max(1, CONFIG.waveIntermissionFullDelayWave - 1);
+    var rampProgress = Math.min(1, (waveNumber - 1) / rampDuration);
+    var intermissionDelay = CONFIG.waveIntermissionStartDelay +
+      (CONFIG.waveIntermissionDelay - CONFIG.waveIntermissionStartDelay) * rampProgress;
+    setTimeout(() => this.startWave(nextIndex), intermissionDelay * 1000);
   },
 
   restart: function () {

@@ -26,7 +26,9 @@ not current.
 7 and 9 are done (desktop/Browser-pane verified; see the caveat below).
 Step 7 was picked up out of order (user request); 6 and 8 are still open.
 Step 10's implementation is complete, with rendered visual verification
-still pending. Steps 11 and 12 remain open. Step 13 is implemented.
+still pending. Step 11's adaptive transitions and assets are implemented;
+rendered verification is pending. Step 12 remains open. Step 13 is
+implemented.
 These steps do not block 6-8 — pick them up whenever, each as its own
 branch + PR per `CLAUDE.md`.
 
@@ -47,7 +49,7 @@ Keep that in mind before calling anything "done" in the VR-comfort sense.
 | 8 | Performance pass + README/ASSETS.md + final docs grep | ⬜ Not started |
 | 9 | Desktop turn controls (rotate, not strafe, on Left/Right) | ✅ Done |
 | 10 | Per-difficulty snowman textures + bigger type-7 + fog spawns | ✅ Implemented; rendered verification pending |
-| 11 | Landscape progression after wave 5 / wave 10 | ⬜ Not started |
+| 11 | Adaptive landscape progression | ✅ Implemented; rendered verification pending |
 | 12 | Lose condition: snowmen approach + touch the player | ⬜ Not started |
 | 13 | Scoring: accuracy bonus | ✅ Implemented |
 
@@ -1012,6 +1014,11 @@ turned out small enough to land in one pass once started.
   just reused per-instance. Early waves use type 1 (fast, builds
   confidence); later waves mix in 3/5/7 for variety and pacing, not just
   raw count.
+- **Intermission pacing:** configurable in `js/config.js`. The pause starts
+  at `waveIntermissionStartDelay` and linearly reaches the existing
+  `waveIntermissionDelay` by `waveIntermissionFullDelayWave`; it stays
+  capped there for all later waves. Defaults are 1 second after wave 1 and
+  2.5 seconds after wave 5 onward.
 - **New `wave-director` component** (likely on `<a-scene>`) is the only new
   piece — everything else it touches already exists:
   - Owns the wave index, an alive-this-wave counter, and score. Reacts only
@@ -1683,73 +1690,27 @@ real Quest 2.
 </details>
 
 <details>
-<summary><strong>Step 11 — landscape progression after wave 5 / wave 10 (⬜ Not started)</strong></summary>
+<summary><strong>Step 11 — adaptive landscape progression (✅ Implemented; rendered verification pending)</strong></summary>
 
-**Scoped 2026-10-28, not yet implemented.** The scene has exactly one
-sky/ground/fog look for the whole session. Ask: change it after wave/level
-5, and again after wave/level 10, with one of the two new looks themed
-around southern Chile. Confirmed with the user: both new landscapes are
-**brand-new real photos** (sourced by the user, same workflow as the
-original sky.jpg), and the Chile silhouette touch is a **hand-edit in
-GIMP/Inkscape** done by the user, with Claude supplying exact steps once
-the base photo is chosen.
+The scene now has three landscape entries. `snowy_park_01_4k.hdr` from
+Poly Haven becomes landscape 2 (`sky2.jpg`/`ground2.jpg`); the initial
+landscape 3 conversion from `snowy_hillside_4k.hdr` was visibly washed out
+and has been replaced by `snowy_forest_path_01_4k.hdr`
+(`sky3.jpg`/`ground3.jpg`). The HDRIs are tone-mapped to 4096x2048 JPGs
+with OpenCV Reinhard (gamma 2.2); each ground is a 650x650 foreground-snow
+crop from its panorama. Sources and CC0 licenses are in `ASSETS.md`.
 
-**Files:** `index.html` (`<a-assets>`, the `<a-sky>`/ground `<a-circle>`
-entities, the scene's `fog` attribute on `<a-scene>`); `js/config.js` (new
-CONFIG values); a new `js/components/landscape-director.js` (imported
-from `js/main.js` next to the existing `js/components/wave-director.js`
-it listens to); plus 2 new photo asset pairs under `assets/sky/`.
+`landscape-director` listens to `wave-state-changed` and updates the sky,
+ground, fog, and sky rotation. Threshold ratios map to the human-readable
+wave number (then convert to a zero-based index), so the default 10-wave
+run changes landscapes as levels 5 and 9 start. The first transition stays
+at 50% of the run; the second moves from 90% at 10 waves to 70% at 20 waves,
+interpolating between those lengths. Changing the run length keeps
+thresholds ordered and within the available run.
 
-1. User sources 2 new CC0 (or otherwise licensed + credited in
-   `ASSETS.md`, same as the Sketchfab model) snow-landscape photos — same
-   constraint already documented above (Claude's own fetch/browse tools
-   can't reach most image hosts; Poly Haven etc. confirmed blocked) — same
-   manual download-and-save-into-project workflow as the original. User
-   picks which of the two gets the south-of-Chile treatment.
-2. For that chosen photo, the Chile touch is a hand-edit: (a) sample the
-   photo's own horizon-band color with a short Pillow pixel-average
-   script, same technique already used for this project's ground/fog
-   colors; (b) draw/paste a simple mountain/volcano cone silhouette on the
-   horizon (Inkscape for a clean vector cone, or GIMP's own shape/path
-   tools); (c) fill it with a slightly darker version of the sampled
-   horizon color; (d) light Gaussian blur on the cone's edge so it reads
-   as atmospheric distance, not a pasted sticker; (e) flatten and export
-   at the same resolution/aspect as the other sky photos so the
-   equirectangular mapping on `<a-sky>` isn't distorted. Claude provides
-   the exact values once the base photo is in hand.
-3. For both new photos, run the same asset pipeline already established
-   in this project: tonemap to `.jpg` if sourced as HDR/EXR, crop a ground
-   tile, sample fog/horizon color with Pillow — producing
-   `assets/sky/sky2.jpg`+`ground2.jpg` and
-   `assets/sky/sky3.jpg`+`ground3.jpg`.
-4. `CONFIG.landscapes`: array of 3 entries (default + 2 new), each with
-   sky asset id, ground asset id, fog `color`/`near`/`far`, and the sky's
-   own `rotation` (current photo uses `rotation="0 120 0"` specifically to
-   keep its tree line out of the throwing lane — each new photo gets its
-   own hand-picked rotation the same visual way, not assumed to be 120).
-5. `CONFIG.landscapeWaveThresholds = [5, 10]`: once `wave-director`'s
-   0-based `waveIndex` reaches 5 (right after wave 5 clears) landscape
-   index 1 activates; at `waveIndex === 10`, landscape index 2 activates.
-   Flagging this interpretation explicitly since "after level 5" could
-   also mean "during wave 5" — a one-line shift if the user wants it to
-   land right when wave 5 *starts* instead.
-6. New `landscape-director` component on `<a-scene>`: listens for the
-   `wave-state-changed` event `wave-director` already emits on every wave
-   change (no new event needed), compares `detail.waveIndex` against the
-   thresholds, and on a crossing sets the `<a-sky>`'s `src`, the ground
-   `<a-circle>`'s `material.src`, and the scene's `fog` attributes to the
-   new landscape's values. Tracks `this.currentLandscapeIndex` so it swaps
-   exactly once per threshold.
-7. Flag only, not required up front: if a new photo's ambient tone differs
-   a lot from the current one, the hemisphere/directional lights (which
-   affect Copito's lit `standard`-shader material, unlike the unlit `flat`
-   sky/ground) might look mismatched — same "shader/lighting mismatch" bug
-   class already seen twice in this project. Check visually after the
-   swap; only add per-landscape light tuning if it's actually visible.
-
-**Verification:** jump `wave-director` directly to wave index 5 and 10 and
-screenshot to confirm the sky/ground/fog swap lands at the right point
-with no visible seam/fog mismatch.
+**Still needed:** rendered verification of both landscape swaps and their
+sky/ground/fog seams; tune rotations and fog if needed. No real Quest 2
+verification has been done.
 
 </details>
 
