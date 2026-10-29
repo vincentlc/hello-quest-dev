@@ -33,18 +33,26 @@ The second sky variant was downloaded as `snowy_park_01_4k.hdr`; the third now u
 
 | File | Source | Author | License |
 |---|---|---|---|
-| `assets/audio/fio-fio-xc249514.ogg` | [Wikimedia Commons recording](https://commons.wikimedia.org/wiki/File:Elaenia_albiceps_-_White-crested_Elaenia_XC249514.mp3) ([Xeno-canto XC249514](https://xeno-canto.org/249514)) | Niels Krabbe | CC BY-SA 4.0 |
+| `assets/audio/rayadito-xc1075472.mp3` | [Xeno-canto XC1075472](https://www.xeno-canto.org/1075472), Thorn-tailed Rayadito (*Aphrastura spinicauda*), Parque Tepuhueico, Chiloé, Chile, 2025 | Marc Anderson | [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/) |
+| `assets/audio/chucao-xc1075454.mp3` | [Xeno-canto XC1075454](https://www.xeno-canto.org/1075454), Chucao Tapaculo (*Scelorchilus rubecula*), Parque Tepuhueico, Chiloé, Chile, 2025 | Marc Anderson | [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/) |
+| `assets/audio/steps/snow-step-01..08.ogg` | 8 of the [41 snow shoe steps](https://opengameart.org/content/41-snow-shoe-steps) (originals 23, 27, 33, 17, 25, 22, 41, 18), extracted from [Freesound #29876](https://freesound.org/s/29876/) | Corsica_S (recording), Iwan Gabovitch (extraction) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
-The fio-fio sample is a field recording made in Tungurahua, Ecuador, not
-southern Chile. It is converted from the original MP3 to mono Ogg at 22.05
-kHz for smaller download size. Calls are played as short, spatialized clips
-at a random moment in each round starting with round 6, alternating between
-the player's left and right sides. The calls are not tied to landscape
-transitions.
-Footsteps, snow impacts, the throw whoosh, and the soft snow breakup are
-short Web Audio textures; there is no continuous generated-noise ambience.
+**Bird recordings (NoDerivatives):** both files are the original
+xeno-canto downloads, byte-for-byte unmodified (only renamed). The
+license allows sharing the material "in whole or in part" but not
+sharing adapted versions, so nothing is cut, filtered or re-encoded in
+the repo. `sound-manager.js` plays only short excerpts (start/end times
+in `BIRD_SPECIES`), and applies fades, a highpass, distance filtering
+and 3D placement at playback time. NonCommercial: fine while this
+project stays free; confirm with the recordist before any use that
+could count as commercial.
 
-**Attribution:** "White-crested Elaenia (Elaenia albiceps), XC249514" by
-Niels Krabbe, via Xeno-canto/Wikimedia Commons, licensed under
-[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Converted
-to mono Ogg at 22.05 kHz.
+**Attribution:** "Thorn-tailed Rayadito (Aphrastura spinicauda),
+XC1075472" and "Chucao Tapaculo (Scelorchilus rubecula), XC1075454" by
+Marc Anderson, via xeno-canto, licensed under CC BY-NC-ND 4.0.
+
+**Snow steps:** trimmed to the step, peak-normalized, converted to mono
+Ogg Vorbis. CC0, no attribution required (credited anyway).
+
+**Synthesized in code:** the throw swish, snowball impacts and the wind
+bed are generated with plain JS at audio unlock (no sample files).

@@ -35,7 +35,7 @@ import { createTextPlane } from '../core/canvas-text.js';
 AFRAME.registerComponent('wave-hud', {
   init: function () {
     this.panel = document.createElement('a-entity');
-    this.panel.setAttribute('position', '0 0.42 -1.3');
+    this.panel.setAttribute('position', '0 0.38 -1.3');
     this.el.appendChild(this.panel);
 
     this.baseText = '';
@@ -48,14 +48,19 @@ AFRAME.registerComponent('wave-hud', {
       autoSizeHeight: true, autoSizeAnchorTop: true
     });
     this.panel.object3D.add(this.card.mesh);
+    // Mute hint sits just above the card (whose top edge stays at
+    // y = +0.1, see autoSizeAnchorTop), so the card can grow downward
+    // with announcements without covering it. Text is ~3.2 cm tall in
+    // world space (original was ~1.4 cm), about 70% of the card text.
+    // Canvas and plane share the same aspect ratio (1024/112 = 0.64/0.07).
     this.soundHint = createTextPlane({
-      width: 0.46, height: 0.055,
-      canvasWidth: 768, canvasHeight: 96,
-      text: '', align: 'center', color: '#B9C1C1', fontSize: 24,
-      background: 'rgba(0, 0, 0, 0.3)', backgroundRadius: 18
+      width: 0.64, height: 0.07,
+      canvasWidth: 1024, canvasHeight: 112,
+      text: '', align: 'center', color: '#E2FBF4', fontSize: 52,
+      background: 'rgba(6, 32, 30, 0.55)', backgroundRadius: 24
     });
-    this.soundHint.mesh.position.y = -0.15;
-    this.soundHint.mesh.material.opacity = 0.72;
+    this.soundHint.mesh.position.y = 0.1 + 0.012 + 0.07 / 2;
+    this.soundHint.mesh.material.opacity = 0.9;
     this.panel.object3D.add(this.soundHint.mesh);
 
     var attach = () => {

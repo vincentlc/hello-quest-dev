@@ -1227,18 +1227,34 @@ more requests:
 <summary><strong>Step 6 — sound + haptics (✅ Implemented; rendered verification pending)</strong></summary>
 
 **Step 6 — sound + haptics: implemented; rendered verification pending.**
-Audio now has no continuous noise bed or respawn chime. Short, subdued
-snow-texture sounds cover walking, throws, impacts, and the snowman's soft
-breakup; footsteps are triggered by actual horizontal player movement.
-Fio-fio calls are spatialized at random moments during each round from round 6
-onward, independently of landscape transitions, alternating between the
-player's left and right sides. The recording is by Niels Krabbe (Xeno-canto
-XC249514), CC BY-SA 4.0, and was recorded in Ecuador rather than Chile; see
-`ASSETS.md`. Audio unlocks on
-the first user gesture. Pressing keyboard A or the right controller's A
-button toggles sound; the muted/unmuted Spanish hint sits below the HUD.
-Keyboard turning stays on the arrow keys so A has one unambiguous action.
-Throw, hit, and explosion haptics use the existing `CONFIG.haptics` values.
+Sound polish pass (third iteration, after listening tests on demo files):
+
+- **Impacts** were one sharp-decaying noise burst that read as "knocking
+  on wood". Now synthesized as snow: soft 12 ms attack, low "pomf" body,
+  soft granular crunch and powder spray (6 pre-rendered variants, random
+  pitch/volume). Spatialized at the hit point with HRTF; loudness is
+  capped at `impactRefDistance` (3.5 m) so close hits are never harsh, and
+  far hits lose highs.
+- **Throw**: soft arm/sleeve swish; the envelope reaches zero before the
+  buffer ends (the earlier version clicked at the end).
+- **Footsteps**: synthesis never sounded natural, replaced by 8 real CC0
+  snow-step recordings, random pick without repeats, +-4% pitch, lowpass.
+- **Birds**: the Ecuador fío-fío (noisy field recording whose background
+  appeared and vanished with each call) is replaced by rayadito and
+  chucao recordings from Chiloé (Marc Anderson, CC BY-NC-ND 4.0). Files
+  ship unmodified; only excerpts play, with fades/filters at runtime.
+  Species alternate, left/right at 10-15 m, from round 6.
+- **Wind bed**: very quiet generated loop from audio unlock, so sounds
+  never appear out of silence.
+- Gentle limiter on the master bus; synth buffers render in small chunks
+  after unlock to avoid a frame hitch on Quest.
+- Mute hint is larger (~2.4 cm text) and sits above the HUD card; the
+  panel moved down 4 cm to keep the hint inside the crisp lens zone.
+
+Audio unlocks on the first user gesture. Pressing keyboard A or the right
+controller's A button toggles sound. Throw, hit, and explosion haptics use
+the existing `CONFIG.haptics` values. Licenses and attribution in
+`ASSETS.md`. Volumes still need tuning in the headset.
 
 
 </details>
