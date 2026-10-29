@@ -2,9 +2,7 @@ import { CONFIG } from '../config.js';
 
 var TURN_DIRECTIONS = {
   ArrowLeft: 1,
-  KeyA: 1,
   ArrowRight: -1,
-  KeyD: -1
 };
 
 AFRAME.registerComponent('desktop-turn', {
@@ -41,8 +39,8 @@ AFRAME.registerComponent('desktop-turn', {
       return;
     }
 
-    var left = this.keys.ArrowLeft || this.keys.KeyA ? 1 : 0;
-    var right = this.keys.ArrowRight || this.keys.KeyD ? 1 : 0;
+    var left = this.keys.ArrowLeft ? 1 : 0;
+    var right = this.keys.ArrowRight ? 1 : 0;
     var direction = left - right;
     if (!direction) return;
 

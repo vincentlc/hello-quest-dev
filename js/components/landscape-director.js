@@ -34,8 +34,9 @@ AFRAME.registerComponent('landscape-director', {
     }
 
     this.currentLandscapeIndex = 0;
-    this.fadeOutDuration = 350;
-    this.fadeInDuration = 450;
+    this.fadeOutDuration = 500;
+    this.blackHoldDuration = 200;
+    this.fadeInDuration = 950;
     this.transitionStartedAt = null;
     this.pendingLandscapeIndex = null;
     this.transitionThresholds = getTransitionThresholds(
@@ -80,9 +81,10 @@ AFRAME.registerComponent('landscape-director', {
       depthWrite: false,
       side: THREE.DoubleSide
     });
-    this.fadeOverlay = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), this.fadeMaterial);
+    this.fadeOverlay = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), this.fadeMaterial);
     this.fadeOverlay.position.z = -1.5;
     this.fadeOverlay.renderOrder = 10000;
+    this.fadeOverlay.frustumCulled = false;
     this.fadeOverlay.visible = false;
     camera.object3D.add(this.fadeOverlay);
   },
@@ -103,6 +105,11 @@ AFRAME.registerComponent('landscape-director', {
     }
 
     var fadeInElapsed = elapsed - this.fadeOutDuration;
+    if (fadeInElapsed < this.blackHoldDuration) {
+      this.fadeMaterial.opacity = 1;
+      return;
+    }
+    fadeInElapsed -= this.blackHoldDuration;
     if (fadeInElapsed < this.fadeInDuration) {
       this.fadeMaterial.opacity = 1 - fadeInElapsed / this.fadeInDuration;
       return;

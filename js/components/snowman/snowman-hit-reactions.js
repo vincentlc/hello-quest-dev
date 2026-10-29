@@ -37,6 +37,10 @@ export default {
     var time = this.lastTime;
     this.hitCount++;
 
+    this.el.emit('snowman-hit', {
+      hitCount: this.hitCount,
+      hitsToExplode: this.hitsToExplode
+    });
     this.spawnSnowPuff(detail.point);
     this.flashMaterials(time);
 

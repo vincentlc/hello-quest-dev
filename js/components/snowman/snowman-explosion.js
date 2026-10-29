@@ -374,6 +374,7 @@ export default {
     this.alive = true;
     this.hitCount = 0; // deferred here from onHit so the destroyed body stays visible for the full respawnDelay
     this.destroyedCount++; // step 7's HUD will read this later
+    this.el.emit('snowman-respawned');
   },
 
   // wave-director's activation call (step 5 bis), for a managed entity
@@ -384,6 +385,8 @@ export default {
   // above). Mirrors finishRespawn's state reset plus the position set a
   // standalone snowman never needed (it's placed once, in the HTML).
   activateForWave: function (position) {
+    var isReuse = this.hasBeenActivated;
+    this.hasBeenActivated = true;
     this.el.object3D.position.set(position.x, position.y, position.z);
     this.hitCount = 0;
     this.alive = true;
@@ -393,5 +396,6 @@ export default {
     this.shadow.object3D.visible = true;
     this.sparkles.visible = true;
     this.hideCrackDecals();
+    if (isReuse) this.el.emit('snowman-respawned');
   }
 };

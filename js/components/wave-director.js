@@ -42,8 +42,8 @@ AFRAME.registerComponent('wave-director', {
 
     this.el.addEventListener('snowman-destroyed', (evt) => this.onSnowmanDestroyed(evt));
     this.el.addEventListener('snowman-cleared', (evt) => this.onSnowmanCleared(evt));
-    this.el.addEventListener('snowball-thrown', () => this.onSnowballThrown());
-    this.el.addEventListener('snowball-hit-registered', () => this.onSnowballHit());
+    this.el.addEventListener('snowball-thrown', (evt) => this.onSnowballThrown(evt));
+    this.el.addEventListener('snowball-hit-registered', (evt) => this.onSnowballHit(evt));
     this.el.addEventListener('start-game', () => this.startFirstWave());
     this.el.addEventListener('restart-game', () => this.restart());
   },

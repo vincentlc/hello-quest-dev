@@ -20,7 +20,8 @@ python3 -m http.server 8080
 ```
 
 Open `http://localhost:8080`. On desktop, move the mouse to look around,
-use W/S or Up/Down to move forward/back, and use Left/Right or A/D to turn.
+use W/S or Up/Down to move forward/back, Left/Right to turn, and press A to
+toggle sound. In VR, press the right controller's A button to toggle sound.
 The same scene also supports Quest controllers in VR.
 
 ## Run it on Meta Quest 2 (over USB)

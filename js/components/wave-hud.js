@@ -48,12 +48,31 @@ AFRAME.registerComponent('wave-hud', {
       autoSizeHeight: true, autoSizeAnchorTop: true
     });
     this.panel.object3D.add(this.card.mesh);
+    this.soundHint = createTextPlane({
+      width: 0.46, height: 0.055,
+      canvasWidth: 768, canvasHeight: 96,
+      text: '', align: 'center', color: '#B9C1C1', fontSize: 24,
+      background: 'rgba(0, 0, 0, 0.3)', backgroundRadius: 18
+    });
+    this.soundHint.mesh.position.y = -0.15;
+    this.soundHint.mesh.material.opacity = 0.72;
+    this.panel.object3D.add(this.soundHint.mesh);
 
     var attach = () => {
-      this.el.sceneEl.addEventListener('wave-state-changed', (evt) => this.updateText(evt.detail));
+      this.onWaveStateChanged = (evt) => this.updateText(evt.detail);
+      this.onSoundStateChanged = (evt) => this.updateSoundHint(evt.detail.enabled);
+      this.el.sceneEl.addEventListener('wave-state-changed', this.onWaveStateChanged);
+      this.el.sceneEl.addEventListener('sound-state-changed', this.onSoundStateChanged);
+      var soundManager = this.el.sceneEl.components['sound-manager'];
+      if (soundManager) this.updateSoundHint(soundManager.soundEnabled);
     };
     if (this.el.sceneEl.hasLoaded) attach();
     else this.el.sceneEl.addEventListener('loaded', attach);
+  },
+
+  updateSoundHint: function (enabled) {
+    var lang = I18N[LANG];
+    this.soundHint.setText(enabled ? lang.muteSoundHint : lang.unmuteSoundHint);
   },
 
   updateText: function (detail) {
@@ -75,5 +94,19 @@ AFRAME.registerComponent('wave-hud', {
       this.announcementTimeout = null;
       this.card.setText(this.baseText);
     }, 5000);
+  },
+
+  remove: function () {
+    if (this.onWaveStateChanged) {
+      this.el.sceneEl.removeEventListener('wave-state-changed', this.onWaveStateChanged);
+      this.el.sceneEl.removeEventListener('sound-state-changed', this.onSoundStateChanged);
+    }
+    if (this.announcementTimeout !== null) clearTimeout(this.announcementTimeout);
+    this.card.mesh.geometry.dispose();
+    this.card.mesh.material.map.dispose();
+    this.card.mesh.material.dispose();
+    this.soundHint.mesh.geometry.dispose();
+    this.soundHint.mesh.material.map.dispose();
+    this.soundHint.mesh.material.dispose();
   }
 });

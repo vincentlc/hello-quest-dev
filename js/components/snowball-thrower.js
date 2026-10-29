@@ -66,7 +66,7 @@ AFRAME.registerComponent('snowball-thrower', {
   throwFromHand: function (handEl, sourceKey) {
     if (!this.canThrow(sourceKey)) return;
     handEl.components['controller-aim'].getAimRay(this.scratchOrigin, this.scratchDir);
-    this.spawn(this.scratchOrigin, this.scratchDir);
+    this.spawn(this.scratchOrigin, this.scratchDir, sourceKey);
     pulseHaptics(handEl, CONFIG.haptics.throw[0], CONFIG.haptics.throw[1]);
   },
 
@@ -75,7 +75,7 @@ AFRAME.registerComponent('snowball-thrower', {
     var camera = this.el.camera;
     if (!camera) return;
     this.raycaster.setFromCamera({ x: DesktopAim.x, y: DesktopAim.y }, camera);
-    this.spawn(this.raycaster.ray.origin, this.raycaster.ray.direction);
+    this.spawn(this.raycaster.ray.origin, this.raycaster.ray.direction, 'desktop');
   },
 
   canThrow: function (sourceKey) {
@@ -85,7 +85,7 @@ AFRAME.registerComponent('snowball-thrower', {
     return true;
   },
 
-  spawn: function (origin, direction) {
+  spawn: function (origin, direction, source) {
     var sb = this.pool[this.nextIndex];
     this.nextIndex = (this.nextIndex + 1) % this.pool.length;
 
@@ -97,6 +97,7 @@ AFRAME.registerComponent('snowball-thrower', {
     sb.state = 'flying';
     sb.spawnTime = this.lastTickTime;
     sb.throwId = ++this.nextThrowId;
+    sb.source = source;
     sb.el.object3D.position.copy(origin);
     sb.el.object3D.scale.set(1, 1, 1);
     sb.el.object3D.visible = true;
@@ -108,7 +109,7 @@ AFRAME.registerComponent('snowball-thrower', {
     // to restart the run (any throw, while its post-credits freeze is
     // active -- not an aimed hit on the panel itself, since requiring
     // precise aim right after reading an end screen isn't the point).
-    this.el.emit('snowball-thrown', { throwId: sb.throwId });
+    this.el.emit('snowball-thrown', { throwId: sb.throwId, source: sb.source });
   },
 
   deactivate: function (sb) {
@@ -247,7 +248,7 @@ AFRAME.registerComponent('snowball-thrower', {
       var pos = sb.el.object3D.position;
       var hitSnowman = this.findHitSnowman(pos);
       if (hitSnowman) {
-        this.el.emit('snowball-hit-registered', { throwId: sb.throwId });
+        this.el.emit('snowball-hit-registered', { throwId: sb.throwId, source: sb.source });
         hitSnowman.el.emit('snowball-hit', { point: { x: pos.x, y: pos.y, z: pos.z } });
         this.deactivate(sb);
         continue;
