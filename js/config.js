@@ -183,6 +183,25 @@ export var CONFIG = {
   waveMaxConcurrentSnowmen: 8,   // cap once past the authored WAVE_TABLE (see getWaveConfig)
   waveIntermissionDelay: 2.5,    // seconds of calm between a wave clearing and the next starting
   waveDestroyBonusPerLife: 10,   // score per "life" (hitsToExplode) on a kill -- a type-7 kill is worth more than a type-1
+  // Landscape changes are distributed across the configured run. The
+  // first change stays at 50%; the second moves from 90% at 10 waves to
+  // 70% at 20 waves, so the current run changes on wave indices 5 and 9.
+  landscapeTransitionRatios: {
+    first: 0.5,
+    secondAt10Waves: 0.9,
+    secondAt20Waves: 0.7
+  },
+  // Add entries for new photos here after adding their <img> assets in
+  // index.html. Each entry supplies sky/ground asset selectors, fog, and
+  // rotation; the first entry mirrors the scene's existing look.
+  landscapes: [
+    {
+      skyAsset: '#sky',
+      groundAsset: '#groundTex',
+      rotation: '0 120 0',
+      fog: { type: 'linear', color: '#aab0b8', near: 4.5, far: 7.9 }
+    }
+  ],
   waveClearBonus: 50,
   // Soft, low-stakes time bonus for clearing a wave quickly -- no fail
   // state, no countdown UI, per the user ("could be soft time but not

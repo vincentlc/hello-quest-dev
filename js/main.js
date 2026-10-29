@@ -20,6 +20,7 @@ import './components/controller-aim.js';
 import './components/mirror-tile.js';
 import './components/snowball-thrower.js';
 import './components/trajectory-preview.js';
+import './components/landscape-director.js';
 import './components/wave-director.js';
 import './components/wave-hud.js';
 import './components/end-screen.js';
