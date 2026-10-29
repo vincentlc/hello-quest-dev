@@ -23,11 +23,11 @@ export var I18N = {
       '¡Buen comienzo!',
       '¡Qué bacán tu avance!',
       '¡Excelente ritmo!',
-      '¡Filete! ¡Muy buen trabajo!',
+      'Top Top Top Top, buen trabajo',
       '¡Cada vez mejor!',
       '¡Qué pulento el desafío!',
       '¡Se nota la precisión!',
-      '¡Impresionante esfuerzo!',
+      '¡Yo opino que es impresionante!',
       '¡Ya casi está!',
       '¡Desafío superado!'
     ],
@@ -43,7 +43,7 @@ export var I18N = {
     finalScore: 'Puntuación final',
     bestScore: 'Mejor puntaje',
     newRecord: '¡Nuevo récord!',
-    createdBy: 'Creado por Vincentlc',
+    createdBy: 'Creado por Vincent-lc',
     restartHint: 'Lanza 5 bolas de nieve para volver a jugar'
   },
   en: {
