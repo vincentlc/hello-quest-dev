@@ -23,7 +23,7 @@ import { createTextPlane } from '../core/canvas-text.js';
 //
 // Text is a canvas-texture plane (see canvas-text.js), not A-Frame's
 // `text` component -- its bundled font turned out to have zero
-// accented glyphs, and while today's "Oleada"/"Puntos" strings happen
+// accented glyphs, and while today's "Ronda"/"Puntos" strings happen
 // not to need any, this project's Spanish copy elsewhere does, and the
 // canvas approach also lets the dark backing card be baked into the
 // same texture (one mesh, no separate a-plane layered behind it).
@@ -58,7 +58,7 @@ AFRAME.registerComponent('wave-hud', {
 
   updateText: function (detail) {
     var lang = I18N[LANG];
-    this.baseText = lang.wave + ' ' + (detail.waveIndex + 1) +
+    this.baseText = lang.wave + ' ' + (detail.waveIndex + 1) + '/' + detail.totalRounds +
       '\n' + lang.score + ': ' + Math.round(detail.score);
     if (this.announcementTimeout !== null) {
       clearTimeout(this.announcementTimeout);

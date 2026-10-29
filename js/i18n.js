@@ -13,11 +13,25 @@ export var I18N = {
     hitLabelSingular: 'golpe',
     hitLabel: 'golpes',
     destroyed: 'Muñecos destruidos',
-    wave: 'Oleada',
+    wave: 'Ronda',
     score: 'Puntos',
-    waveBonus: 'Oleada',
+    waveBonus: 'Ronda',
     timeBonus: 'Tiempo',
     accuracyBonus: 'Precisión',
+    accuracyBreakdown: '{hits}/{throws} = {accuracy}% × {factor}%',
+    roundCelebrations: [
+      '¡Buen comienzo!',
+      '¡Gran avance!',
+      '¡Excelente ritmo!',
+      '¡Muy buen trabajo!',
+      '¡Cada vez mejor!',
+      '¡Qué gran progreso!',
+      '¡Se nota la precisión!',
+      '¡Impresionante esfuerzo!',
+      '¡Ya casi está!',
+      '¡Desafío superado!'
+    ],
+    roundComplete: 'Ronda {round} completada',
     // "Te damos la bienvenida" instead of "¡Bienvenido!" -- gender-neutral
     // phrasing (no -o/-a ending to agree with the player's gender), per
     // the user's request. Subtitle no longer repeats "bienvenido" for the
@@ -46,6 +60,20 @@ export var I18N = {
     waveBonus: 'Wave bonus',
     timeBonus: 'Time bonus',
     accuracyBonus: 'Accuracy',
+    accuracyBreakdown: '{hits}/{throws} = {accuracy}% × {factor}%',
+    roundCelebrations: [
+      'Great start!',
+      'Great progress!',
+      'Excellent pace!',
+      'Well done!',
+      'Getting better!',
+      'Great progress!',
+      'Great accuracy!',
+      'Impressive effort!',
+      'Almost there!',
+      'Challenge complete!'
+    ],
+    roundComplete: 'Round {round} complete',
     welcomeTitle: 'Welcome!',
     welcomeSubtitle: 'Snoworld Copito: the game that takes on the snowmen',
     gameComplete: 'Game complete!',
