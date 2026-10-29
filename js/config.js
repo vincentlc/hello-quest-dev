@@ -188,7 +188,9 @@ export var CONFIG = {
   waveArcFullDeg: 360,           // full circle -- can spawn behind the player
   waveArcFullThreshold: 5,       // snowman count at/above which the full-circle arc kicks in
   waveMaxConcurrentSnowmen: 8,   // cap once past the authored WAVE_TABLE (see getWaveConfig)
-  waveIntermissionDelay: 2.5,    // seconds of calm between a wave clearing and the next starting
+  waveIntermissionDelay: 2.5,    // full intermission duration, reached by wave 5
+  waveIntermissionStartDelay: 1, // shorter pause after the opening wave
+  waveIntermissionFullDelayWave: 5, // keep the full delay from this wave onward
   waveDestroyBonusPerLife: 10,   // score per "life" (hitsToExplode) on a kill -- a type-7 kill is worth more than a type-1
   // Landscape changes are distributed across the configured run. The
   // first change stays at 50%; the second moves from 90% at 10 waves to

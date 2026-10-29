@@ -1014,6 +1014,11 @@ turned out small enough to land in one pass once started.
   just reused per-instance. Early waves use type 1 (fast, builds
   confidence); later waves mix in 3/5/7 for variety and pacing, not just
   raw count.
+- **Intermission pacing:** configurable in `js/config.js`. The pause starts
+  at `waveIntermissionStartDelay` and linearly reaches the existing
+  `waveIntermissionDelay` by `waveIntermissionFullDelayWave`; it stays
+  capped there for all later waves. Defaults are 1 second after wave 1 and
+  2.5 seconds after wave 5 onward.
 - **New `wave-director` component** (likely on `<a-scene>`) is the only new
   piece — everything else it touches already exists:
   - Owns the wave index, an alive-this-wave counter, and score. Reacts only
