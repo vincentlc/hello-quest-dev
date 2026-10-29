@@ -1692,6 +1692,10 @@ real Quest 2.
 <details>
 <summary><strong>Step 11 — adaptive landscape progression (✅ Implemented; rendered verification pending)</strong></summary>
 
+Landscape swaps now fade the view to black before changing the sky, ground,
+and fog, then fade back in (350 ms out, 450 ms in). This also works when a
+restart returns the run to an earlier landscape.
+
 The scene now has three landscape entries. `snowy_park_01_4k.hdr` from
 Poly Haven becomes landscape 2 (`sky2.jpg`/`ground2.jpg`); the initial
 landscape 3 conversion from `snowy_hillside_4k.hdr` was visibly washed out
@@ -1870,6 +1874,17 @@ The per-wave throw and hit counters reset at each wave; a dedicated
 `snowball-hit-registered` event carries the throw ID and is emitted before
 snowman hit handling, so the final impact is included while throws from an
 intermission or a previous wave cannot inflate the next wave's accuracy.
+
+**Follow-up adjustment:** Accuracy now starts in round 1, rather than round
+7, and its maximum share grows from 25% by 5 percentage points per round up
+to 75%. The round-clear breakdown shows hits/throws and the hit percentage
+alongside the points awarded, so a zero can be understood as no successful
+hits rather than an unexplained score. Spanish uses "Ronda" throughout the
+HUD and displays progress as `Ronda N/10`. Each cleared round also shows a
+gender-neutral, round-specific message with a short burst of cube particles.
+The user approved "bacán", "filete", and "pulento" for the Spanish copy;
+they are used about the player's progress, work, and the challenge, not to
+gender the player.
 
 </details>
 

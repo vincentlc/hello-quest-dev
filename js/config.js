@@ -224,7 +224,8 @@ export var CONFIG = {
       fog: { type: 'linear', color: '#6B727D', near: 4.5, far: 7.9 }
     }
   ],
-  // Wave-clear and time bonuses start at wave 5.
+  // Wave-clear/time bonuses start at wave 5. Accuracy starts immediately
+  // and scales with both the hit rate and the wave's base snowman score.
   waveBonusStartWave: 5,
   waveClearBonus: 50,
   waveClearBonusIncreasePerWave: 10,
@@ -232,10 +233,10 @@ export var CONFIG = {
   waveSoftTimerBonusPerSnowman: 10,
   waveSoftTimerDecayPerSecond: 1,
   waveTimeBonusIncreasePerWave: 0.1,
-  waveEfficiencyStartWave: 7,
-  waveEfficiencyBonusBase: 0.1,
+  waveEfficiencyStartWave: 1,
+  waveEfficiencyBonusBase: 0.25,
   waveEfficiencyBonusIncreasePerWave: 0.05,
-  waveEfficiencyBonusMax: 0.5,
+  waveEfficiencyBonusMax: 0.75,
 
   // End-of-run credits screen (step 7). Modular on purpose: once
   // (waveIndex + 1) reaches this number, wave-director stops scheduling

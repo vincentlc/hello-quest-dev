@@ -15,7 +15,7 @@ remaining planned steps are tracked in `PROGRESS.md`.
 ## Run it on desktop (Chrome)
 
 ```bash
-cd ~/Documents/Code/GitHub/hello-quest-dev
+cd hello-quest-dev
 python3 -m http.server 8080
 ```
 

@@ -221,6 +221,7 @@ AFRAME.registerComponent('wave-director', {
     this.el.emit('wave-state-changed', {
       waveIndex: this.waveIndex,
       score: this.score,
+      totalRounds: CONFIG.creditsAfterWave,
       announcement: announcement || ''
     });
   },
@@ -234,9 +235,8 @@ AFRAME.registerComponent('wave-director', {
     if (entry) entry.inUse = false;
   },
 
-  // Bonuses begin at wave 5. The wave-clear and time rewards grow with
-  // each later wave; accuracy is added from wave 7 and scales with the
-  // proportion of thrown snowballs that hit.
+  // Wave-clear and time rewards begin at wave 5. Accuracy starts on the
+  // first wave and scales with the proportion of throws that hit.
   scheduleNextWave: function () {
     var waveNumber = this.waveIndex + 1;
     var clearBonus = 0;
@@ -258,20 +258,26 @@ AFRAME.registerComponent('wave-director', {
       announcement.push(I18N[LANG].waveBonus + ': +' + clearBonus);
       if (timeBonus > 0) announcement.push(I18N[LANG].timeBonus + ': +' + timeBonus);
 
-      if (waveNumber >= CONFIG.waveEfficiencyStartWave) {
-        var accuracy = this.waveThrows > 0
-          ? Math.min(1, this.waveHits / this.waveThrows)
-          : 0;
-        var efficiencyPercent = Math.min(
-          CONFIG.waveEfficiencyBonusMax,
-          CONFIG.waveEfficiencyBonusBase +
-            (waveNumber - CONFIG.waveEfficiencyStartWave) *
-            CONFIG.waveEfficiencyBonusIncreasePerWave
-        );
-        accuracyBonus = Math.round(this.waveDestroyScore * efficiencyPercent * accuracy);
-        announcement.push(I18N[LANG].accuracyBonus + ' ' +
-          Math.round(accuracy * 100) + '%: +' + accuracyBonus);
-      }
+    }
+
+    if (waveNumber >= CONFIG.waveEfficiencyStartWave) {
+      var accuracy = this.waveThrows > 0
+        ? Math.min(1, this.waveHits / this.waveThrows)
+        : 0;
+      var efficiencyPercent = Math.min(
+        CONFIG.waveEfficiencyBonusMax,
+        CONFIG.waveEfficiencyBonusBase +
+          (waveNumber - CONFIG.waveEfficiencyStartWave) *
+          CONFIG.waveEfficiencyBonusIncreasePerWave
+      );
+      accuracyBonus = Math.round(this.waveDestroyScore * efficiencyPercent * accuracy);
+      var accuracyBreakdown = I18N[LANG].accuracyBreakdown
+        .replace('{hits}', this.waveHits)
+        .replace('{throws}', this.waveThrows)
+        .replace('{accuracy}', Math.round(accuracy * 100))
+        .replace('{factor}', Math.round(efficiencyPercent * 100));
+      announcement.push(I18N[LANG].accuracyBonus + ': ' +
+        accuracyBreakdown + ': +' + accuracyBonus);
     }
 
     this.score += clearBonus + timeBonus + accuracyBonus;
@@ -289,6 +295,10 @@ AFRAME.registerComponent('wave-director', {
       this.el.emit('game-complete', { score: this.score });
       return;
     }
+    this.el.emit('round-cleared', {
+      roundNumber: waveNumber,
+      totalRounds: CONFIG.creditsAfterWave
+    });
     var rampDuration = Math.max(1, CONFIG.waveIntermissionFullDelayWave - 1);
     var rampProgress = Math.min(1, (waveNumber - 1) / rampDuration);
     var intermissionDelay = CONFIG.waveIntermissionStartDelay +

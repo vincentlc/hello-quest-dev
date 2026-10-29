@@ -34,12 +34,19 @@ AFRAME.registerComponent('landscape-director', {
     }
 
     this.currentLandscapeIndex = 0;
+    this.fadeOutDuration = 350;
+    this.fadeInDuration = 450;
+    this.transitionStartedAt = null;
+    this.pendingLandscapeIndex = null;
     this.transitionThresholds = getTransitionThresholds(
       CONFIG.creditsAfterWave,
       CONFIG.landscapes.length
     );
     this.onWaveStateChanged = (evt) => this.updateLandscape(evt.detail.waveIndex);
     this.el.addEventListener('wave-state-changed', this.onWaveStateChanged);
+    this.onSceneLoaded = () => this.createFadeOverlay();
+    if (this.el.hasLoaded) this.createFadeOverlay();
+    else this.el.addEventListener('loaded', this.onSceneLoaded, { once: true });
   },
 
   updateLandscape: function (waveIndex) {
@@ -50,8 +57,59 @@ AFRAME.registerComponent('landscape-director', {
     }
     if (landscapeIndex === this.currentLandscapeIndex) return;
 
-    this.applyLandscape(CONFIG.landscapes[landscapeIndex]);
-    this.currentLandscapeIndex = landscapeIndex;
+    if (this.transitionStartedAt !== null) {
+      this.pendingLandscapeIndex = landscapeIndex;
+      return;
+    }
+    this.pendingLandscapeIndex = landscapeIndex;
+    this.transitionStartedAt = performance.now();
+    if (this.fadeOverlay) this.fadeOverlay.visible = true;
+  },
+
+  createFadeOverlay: function () {
+    var camera = this.el.querySelector('[camera]');
+    if (!camera) {
+      throw new Error('[landscape-director] Expected a camera entity for the fade transition.');
+    }
+    var THREE = AFRAME.THREE;
+    this.fadeMaterial = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    this.fadeOverlay = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), this.fadeMaterial);
+    this.fadeOverlay.position.z = -1.5;
+    this.fadeOverlay.renderOrder = 10000;
+    this.fadeOverlay.visible = false;
+    camera.object3D.add(this.fadeOverlay);
+  },
+
+  tick: function () {
+    if (this.transitionStartedAt === null || !this.fadeOverlay) return;
+    var elapsed = performance.now() - this.transitionStartedAt;
+    if (elapsed < this.fadeOutDuration) {
+      this.fadeMaterial.opacity = elapsed / this.fadeOutDuration;
+      return;
+    }
+
+    this.fadeMaterial.opacity = 1;
+    if (this.pendingLandscapeIndex !== null) {
+      this.applyLandscape(CONFIG.landscapes[this.pendingLandscapeIndex]);
+      this.currentLandscapeIndex = this.pendingLandscapeIndex;
+      this.pendingLandscapeIndex = null;
+    }
+
+    var fadeInElapsed = elapsed - this.fadeOutDuration;
+    if (fadeInElapsed < this.fadeInDuration) {
+      this.fadeMaterial.opacity = 1 - fadeInElapsed / this.fadeInDuration;
+      return;
+    }
+    this.fadeMaterial.opacity = 0;
+    this.fadeOverlay.visible = false;
+    this.transitionStartedAt = null;
   },
 
   applyLandscape: function (landscape) {
@@ -75,5 +133,11 @@ AFRAME.registerComponent('landscape-director', {
 
   remove: function () {
     this.el.removeEventListener('wave-state-changed', this.onWaveStateChanged);
+    this.el.removeEventListener('loaded', this.onSceneLoaded);
+    if (this.fadeOverlay) {
+      this.fadeOverlay.parent.remove(this.fadeOverlay);
+      this.fadeOverlay.geometry.dispose();
+      this.fadeMaterial.dispose();
+    }
   }
 });
