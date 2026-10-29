@@ -25,9 +25,11 @@ import { pulseHaptics } from '../core/haptics.js';
 // ---------------------------------------------------------------------
 
 // [start, end] seconds inside the original recordings.
+// gain: per-species level on top of CONFIG.volume.forestBird (the chucao
+// sings lower and reads quieter at distance, so it gets a boost).
 var BIRD_SPECIES = [
-  { key: 'rayadito', highpass: 1200, clips: [[2.9, 5.45], [5.35, 7.15], [2.9, 7.15]] },
-  { key: 'chucao', highpass: 150, clips: [[4.3, 5.7], [5.75, 6.95], [4.3, 6.95]] }
+  { key: 'rayadito', highpass: 1200, gain: 1, clips: [[2.9, 5.45], [5.35, 7.15], [2.9, 7.15]] },
+  { key: 'chucao', highpass: 150, gain: 1.5, clips: [[4.3, 5.7], [5.75, 6.95], [4.3, 6.95]] }
 ];
 var BIRD_FADE = 0.15;
 var IMPACT_VARIANTS = 6;
@@ -223,6 +225,7 @@ AFRAME.registerComponent('sound-manager', {
     this.birdGain = null;
     this.birdTimer = null;
     this.lastBirdSpecies = -1;
+    this.sameBirdStreak = 0;
     this.currentWaveNumber = 0;
     this.waveScheduleVersion = 0;
     this.nextBirdSide = -1;
@@ -312,7 +315,7 @@ AFRAME.registerComponent('sound-manager', {
       limiter.release.value = 0.25;
       limiter.connect(this.audioContext.destination);
       this.masterGain = this.audioContext.createGain();
-      this.masterGain.gain.value = this.soundEnabled ? 1 : 0;
+      this.masterGain.gain.value = this.soundEnabled ? CONFIG.volume.master : 0;
       this.masterGain.connect(limiter);
       this.renderSynthBuffers();
       this.loadFootsteps();
@@ -395,7 +398,7 @@ AFRAME.registerComponent('sound-manager', {
     if (!this.masterGain) return;
     var now = this.audioContext.currentTime;
     this.masterGain.gain.cancelScheduledValues(now);
-    this.masterGain.gain.setTargetAtTime(this.soundEnabled ? 1 : 0, now, 0.025);
+    this.masterGain.gain.setTargetAtTime(this.soundEnabled ? CONFIG.volume.master : 0, now, 0.025);
   },
 
   pick: function (list) {
@@ -591,10 +594,13 @@ AFRAME.registerComponent('sound-manager', {
 
   playBirdCall: function () {
     var context = this.audioContext;
-    // Alternate species so the same bird never sings twice in a row.
-    var speciesIndex = this.lastBirdSpecies === -1
-      ? Math.floor(Math.random() * BIRD_SPECIES.length)
-      : (this.lastBirdSpecies + 1) % BIRD_SPECIES.length;
+    // Mostly chucao, but never three calls in a row from the same bird.
+    var chucaoIndex = 1;
+    var speciesIndex = Math.random() < CONFIG.sound.chucaoShare ? chucaoIndex : 0;
+    if (speciesIndex === this.lastBirdSpecies && this.sameBirdStreak >= 2) {
+      speciesIndex = 1 - speciesIndex;
+    }
+    this.sameBirdStreak = speciesIndex === this.lastBirdSpecies ? this.sameBirdStreak + 1 : 1;
     this.lastBirdSpecies = speciesIndex;
     var species = BIRD_SPECIES[speciesIndex];
     var buffer = this.birdBuffers[species.key];
@@ -623,7 +629,7 @@ AFRAME.registerComponent('sound-manager', {
     air.frequency.value = Math.max(2500, 14000 / (1 + distance / 8));
     var gain = context.createGain();
     var now = context.currentTime;
-    var volume = CONFIG.volume.forestBird;
+    var volume = CONFIG.volume.forestBird * species.gain;
     gain.gain.setValueAtTime(0, now);
     gain.gain.linearRampToValueAtTime(volume, now + BIRD_FADE);
     gain.gain.setValueAtTime(volume, now + duration - BIRD_FADE);
@@ -648,6 +654,8 @@ AFRAME.registerComponent('sound-manager', {
       if (this.birdSource === source) {
         this.birdSource = null;
         this.birdGain = null;
+        this.scheduleBirdCall(randomBetween(
+          CONFIG.sound.birdRepeatDelayMin, CONFIG.sound.birdRepeatDelayMax));
       }
       source.disconnect();
       cleanup.disconnect();

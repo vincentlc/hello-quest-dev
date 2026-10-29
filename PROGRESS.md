@@ -1256,6 +1256,20 @@ controller's A button toggles sound. Throw, hit, and explosion haptics use
 the existing `CONFIG.haptics` values. Licenses and attribution in
 `ASSETS.md`. Volumes still need tuning in the headset.
 
+Feedback round after first play test:
+- Overall volume lowered (`CONFIG.volume.master` 0.7); close impacts and
+  explosions softer (`impactRefDistance` 5 m, lower hit/explosion gain).
+- Birds louder, chucao boosted (x1.5) and more frequent (~60% of calls);
+  several calls per round instead of one.
+- Footsteps keep a steady walking cadence (0.6 m / 560 ms) instead of
+  speeding up with accelerating desktop movement.
+- Landscape changes (rounds 5 and 9) now fade out, swap and fade in
+  during the intermission, after the round banner; the next round's
+  snowmen spawn only after `landscape-changed` (wave-director asks
+  landscape-director via `prepareForWave`).
+- Round-complete banner moved slightly below eye level so it no longer
+  covers the HUD card's bonus breakdown.
+
 
 </details>
 

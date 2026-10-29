@@ -303,11 +303,24 @@ AFRAME.registerComponent('wave-director', {
     var rampProgress = Math.min(1, (waveNumber - 1) / rampDuration);
     var intermissionDelay = CONFIG.waveIntermissionStartDelay +
       (CONFIG.waveIntermissionDelay - CONFIG.waveIntermissionStartDelay) * rampProgress;
-    setTimeout(() => this.startWave(nextIndex), intermissionDelay * 1000);
+    var landscape = this.el.components['landscape-director'];
+    if (landscape) landscape.prepareForWave(nextIndex, CONFIG.landscapeFadeDelay);
+    setTimeout(() => this.startWaveWhenLandscapeReady(nextIndex), intermissionDelay * 1000);
+  },
+
+  // Snowmen of a round that changes landscape only appear after the new
+  // landscape has faded in, never before the swap.
+  startWaveWhenLandscapeReady: function (index) {
+    var landscape = this.el.components['landscape-director'];
+    if (landscape && landscape.prepareForWave(index, 0)) {
+      this.el.addEventListener('landscape-changed', () => this.startWave(index), { once: true });
+      return;
+    }
+    this.startWave(index);
   },
 
   restart: function () {
     this.score = 0;
-    this.startWave(0);
+    this.startWaveWhenLandscapeReady(0);
   }
 });
