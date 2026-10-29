@@ -20,10 +20,14 @@ Internal in-code naming ("Copito") is kept as a project nickname only, unrelated
 | File | Source | Author | License |
 |---|---|---|---|
 | `assets/sky/sky.jpg` | [Passendorf Snow HDRI](https://polyhaven.com/a/passendorf_snow), Poly Haven | Poly Haven | CC0 |
+| `assets/sky/sky2.jpg` | [Snowy Park 01 HDRI](https://polyhaven.com/a/snowy_park_01), Poly Haven | Oliksiy Yakovlyev | CC0 |
+| `assets/sky/sky3.jpg` | [Snowy Hillside HDRI](https://polyhaven.com/a/snowy_hillside), Poly Haven | Andreas Mischok | CC0 |
 
 Downloaded as `passendorf_snow_4k.hdr` (4096x2048, 23.5 MB) and converted locally: tone-mapped to 8-bit with OpenCV's Reinhard operator (gamma 2.2), saved as JPG at quality 85, final size 0.88 MB. Poly Haven only offers one fixed-resolution "tonemapped JPG" export per asset (not a 4096x2048 option directly), so downloading the HDR at our target 4096x2048 resolution and tone-mapping it ourselves was the practical path to hit the size budget without upscaling or re-downscaling a larger JPG.
 
 The raw `passendorf_snow_4k.hdr` is kept in `assets/sky/` for reference; only `sky.jpg` is referenced by `index.html`.
+
+The second and third sky variants were downloaded as `snowy_park_01_4k.hdr` and `snowy_hillside_4k.hdr`, tone-mapped with the same Reinhard pipeline, and saved as `sky2.jpg` / `sky3.jpg` at 4096x2048 with 650x650 mirrored ground crops saved as `ground2.jpg` / `ground3.jpg`. Their fog/horizon values were sampled from the landscape itself and entered in `js/config.js` for the adaptive transitions.
 
 ## Sound
 

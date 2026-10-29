@@ -45,7 +45,7 @@ Keep that in mind before calling anything "done" in the VR-comfort sense.
 | 8 | Performance pass + README/ASSETS.md + final docs grep | ⬜ Not started |
 | 9 | Desktop turn controls (rotate, not strafe, on Left/Right) | ⬜ Not started |
 | 10 | Per-difficulty snowman textures + bigger type-7 | ⬜ Not started |
-| 11 | Adaptive landscape progression | 🟡 Logic implemented; photos pending |
+| 11 | Adaptive landscape progression | ✅ Done |
 | 12 | Lose condition: snowmen approach + touch the player | ⬜ Not started |
 | 13 | Scoring: accuracy bonus | ⬜ Not started |
 

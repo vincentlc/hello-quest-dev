@@ -200,6 +200,18 @@ export var CONFIG = {
       groundAsset: '#groundTex',
       rotation: '0 120 0',
       fog: { type: 'linear', color: '#aab0b8', near: 4.5, far: 7.9 }
+    },
+    {
+      skyAsset: '#sky2',
+      groundAsset: '#ground2',
+      rotation: '0 120 0',
+      fog: { type: 'linear', color: '#C6AC9C', near: 4.5, far: 7.9 }
+    },
+    {
+      skyAsset: '#sky3',
+      groundAsset: '#ground3',
+      rotation: '0 120 0',
+      fog: { type: 'linear', color: '#D2D2D6', near: 4.5, far: 7.9 }
     }
   ],
   waveClearBonus: 50,
