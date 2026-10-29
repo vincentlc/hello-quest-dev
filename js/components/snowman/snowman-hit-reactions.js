@@ -37,6 +37,11 @@ export default {
     var time = this.lastTime;
     this.hitCount++;
 
+    this.el.emit('snowman-hit', {
+      hitCount: this.hitCount,
+      hitsToExplode: this.hitsToExplode,
+      point: detail.point // world position, sound-manager spatializes the hit here
+    });
     this.spawnSnowPuff(detail.point);
     this.flashMaterials(time);
 

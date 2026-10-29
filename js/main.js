@@ -18,6 +18,7 @@ import './core/desktop-aim.js';
 
 import './components/controller-aim.js';
 import './components/desktop-turn.js';
+import './components/sound-manager.js';
 import './components/mirror-tile.js';
 import './components/snowball-thrower.js';
 import './components/trajectory-preview.js';

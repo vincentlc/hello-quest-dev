@@ -196,6 +196,10 @@ export var CONFIG = {
   // first change stays at 50%; the second moves from 90% at 10 waves to
   // 70% at 20 waves. Threshold ratios identify the wave number to start
   // (not the zero-based index), so 10 waves changes on levels 5 and 9.
+  // After a round is cleared, wait this long (ms) so the round banner can
+  // be read, then fade to the next landscape. The next round's snowmen
+  // only appear once the new landscape has faded in.
+  landscapeFadeDelay: 1600,
   landscapeTransitionRatios: {
     first: 0.5,
     secondAt10Waves: 0.9,
@@ -268,14 +272,43 @@ export var CONFIG = {
   scorePopupDuration: 1.4,
   scorePopupHeight: 0.55,
 
-  // Sound volumes 0 to 1 (step 6)
+  // Sound settings (step 6)
+  sound: {
+    // Original, unmodified xeno-canto recordings (CC BY-NC-ND 4.0, see
+    // ASSETS.md). sound-manager plays short excerpts of them only.
+    birdRecordings: {
+      rayadito: 'assets/audio/rayadito-xc1075472.mp3',
+      chucao: 'assets/audio/chucao-xc1075454.mp3'
+    },
+    // CC0 snow-step recordings, one is picked at random per step.
+    footstepSamples: [1, 2, 3, 4, 5, 6, 7, 8].map((n) =>
+      'assets/audio/steps/snow-step-0' + n + '.ogg'),
+    // A step needs this much horizontal movement (m) and at least this
+    // long (ms) since the previous one: a steady walking cadence, even
+    // when desktop keyboard movement keeps accelerating.
+    footstepDistance: 0.6,
+    footstepMinInterval: 560,
+    // Impacts closer than this (m) are not louder than at this distance.
+    impactRefDistance: 5,
+    birdCallStartWave: 6,
+    birdRoundDelayMin: 5000,
+    birdRoundDelayMax: 20000,
+    // After a call, another one follows within the same round.
+    birdRepeatDelayMin: 8000,
+    birdRepeatDelayMax: 16000,
+    // Chance a call is a chucao (rest rayadito). The same bird never
+    // sings three times in a row, so the real share ends up near 60%.
+    chucaoShare: 0.75
+  },
+  // Sound volumes 0 to 1. Keep environmental and snow sounds subtle.
   volume: {
-    throw: 0.5,
-    hit: 0.6,
-    crack: 0.6,
-    explosion: 0.8,
-    respawn: 0.6,
-    ambience: 0.25
+    master: 0.7,
+    throw: 0.16,
+    hit: 0.26,
+    explosion: 0.26,
+    footstep: 0.13,
+    forestBird: 0.5,
+    wind: 0.025
   },
 
   // Haptic pulses: [intensity 0 to 1, duration ms] (step 6)

@@ -34,36 +34,57 @@ AFRAME.registerComponent('landscape-director', {
     }
 
     this.currentLandscapeIndex = 0;
-    this.fadeOutDuration = 350;
-    this.fadeInDuration = 450;
+    this.fadeOutDuration = 500;
+    this.blackHoldDuration = 200;
+    this.fadeInDuration = 950;
     this.transitionStartedAt = null;
     this.pendingLandscapeIndex = null;
+    this.delayedStart = null;
     this.transitionThresholds = getTransitionThresholds(
       CONFIG.creditsAfterWave,
       CONFIG.landscapes.length
     );
-    this.onWaveStateChanged = (evt) => this.updateLandscape(evt.detail.waveIndex);
-    this.el.addEventListener('wave-state-changed', this.onWaveStateChanged);
     this.onSceneLoaded = () => this.createFadeOverlay();
     if (this.el.hasLoaded) this.createFadeOverlay();
     else this.el.addEventListener('loaded', this.onSceneLoaded, { once: true });
   },
 
-  updateLandscape: function (waveIndex) {
+  landscapeIndexForWave: function (waveIndex) {
     var landscapeIndex = 0;
     for (var i = 0; i < this.transitionThresholds.length; i++) {
       if (waveIndex < this.transitionThresholds[i]) break;
       landscapeIndex++;
     }
-    if (landscapeIndex === this.currentLandscapeIndex) return;
+    return landscapeIndex;
+  },
 
-    if (this.transitionStartedAt !== null) {
-      this.pendingLandscapeIndex = landscapeIndex;
-      return;
+  isTransitioning: function () {
+    return this.delayedStart !== null || this.transitionStartedAt !== null;
+  },
+
+  // Called by wave-director before a round starts. Starts the fade to the
+  // landscape that round needs (after delayMs) and returns true while a
+  // transition is scheduled or running, so the caller waits for
+  // 'landscape-changed' before spawning snowmen.
+  prepareForWave: function (waveIndex, delayMs) {
+    var landscapeIndex = this.landscapeIndexForWave(waveIndex);
+    if (this.isTransitioning()) {
+      if (this.transitionStartedAt === null || this.pendingLandscapeIndex !== null) {
+        this.pendingLandscapeIndex = landscapeIndex;
+        this.transitionWaveIndex = waveIndex;
+      }
+      return true;
     }
+    if (landscapeIndex === this.currentLandscapeIndex) return false;
+
     this.pendingLandscapeIndex = landscapeIndex;
-    this.transitionStartedAt = performance.now();
-    if (this.fadeOverlay) this.fadeOverlay.visible = true;
+    this.transitionWaveIndex = waveIndex;
+    this.delayedStart = setTimeout(() => {
+      this.delayedStart = null;
+      this.transitionStartedAt = performance.now();
+      if (this.fadeOverlay) this.fadeOverlay.visible = true;
+    }, delayMs || 0);
+    return true;
   },
 
   createFadeOverlay: function () {
@@ -80,9 +101,10 @@ AFRAME.registerComponent('landscape-director', {
       depthWrite: false,
       side: THREE.DoubleSide
     });
-    this.fadeOverlay = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), this.fadeMaterial);
+    this.fadeOverlay = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), this.fadeMaterial);
     this.fadeOverlay.position.z = -1.5;
     this.fadeOverlay.renderOrder = 10000;
+    this.fadeOverlay.frustumCulled = false;
     this.fadeOverlay.visible = false;
     camera.object3D.add(this.fadeOverlay);
   },
@@ -103,6 +125,11 @@ AFRAME.registerComponent('landscape-director', {
     }
 
     var fadeInElapsed = elapsed - this.fadeOutDuration;
+    if (fadeInElapsed < this.blackHoldDuration) {
+      this.fadeMaterial.opacity = 1;
+      return;
+    }
+    fadeInElapsed -= this.blackHoldDuration;
     if (fadeInElapsed < this.fadeInDuration) {
       this.fadeMaterial.opacity = 1 - fadeInElapsed / this.fadeInDuration;
       return;
@@ -110,6 +137,10 @@ AFRAME.registerComponent('landscape-director', {
     this.fadeMaterial.opacity = 0;
     this.fadeOverlay.visible = false;
     this.transitionStartedAt = null;
+    this.el.emit('landscape-changed', {
+      landscapeIndex: this.currentLandscapeIndex,
+      waveIndex: this.transitionWaveIndex
+    });
   },
 
   applyLandscape: function (landscape) {
@@ -132,7 +163,7 @@ AFRAME.registerComponent('landscape-director', {
   },
 
   remove: function () {
-    this.el.removeEventListener('wave-state-changed', this.onWaveStateChanged);
+    if (this.delayedStart !== null) clearTimeout(this.delayedStart);
     this.el.removeEventListener('loaded', this.onSceneLoaded);
     if (this.fadeOverlay) {
       this.fadeOverlay.parent.remove(this.fadeOverlay);

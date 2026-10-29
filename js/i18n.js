@@ -44,7 +44,9 @@ export var I18N = {
     bestScore: 'Mejor puntaje',
     newRecord: '¡Nuevo récord!',
     createdBy: 'Creado por Vincent-lc',
-    restartHint: 'Lanza 5 bolas de nieve para volver a jugar'
+    restartHint: 'Lanza 5 bolas de nieve para volver a jugar',
+    muteSoundHint: 'Presiona A para silenciar el sonido',
+    unmuteSoundHint: 'Presiona A para activar el sonido'
   },
   en: {
     instructionVR: 'Pull trigger 3 times to start',
@@ -81,7 +83,9 @@ export var I18N = {
     bestScore: 'Best score',
     newRecord: 'New record!',
     createdBy: 'Created by Vincentlc',
-    restartHint: 'Throw 5 snowballs to play again'
+    restartHint: 'Throw 5 snowballs to play again',
+    muteSoundHint: 'Press A to mute sound',
+    unmuteSoundHint: 'Press A to turn sound on'
   }
 };
 export var LANG = 'es';

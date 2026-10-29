@@ -35,7 +35,7 @@ import { createTextPlane } from '../core/canvas-text.js';
 AFRAME.registerComponent('wave-hud', {
   init: function () {
     this.panel = document.createElement('a-entity');
-    this.panel.setAttribute('position', '0 0.42 -1.3');
+    this.panel.setAttribute('position', '0 0.38 -1.3');
     this.el.appendChild(this.panel);
 
     this.baseText = '';
@@ -48,12 +48,36 @@ AFRAME.registerComponent('wave-hud', {
       autoSizeHeight: true, autoSizeAnchorTop: true
     });
     this.panel.object3D.add(this.card.mesh);
+    // Mute hint sits just above the card (whose top edge stays at
+    // y = +0.1, see autoSizeAnchorTop), so the card can grow downward
+    // with announcements without covering it. Text is ~3.2 cm tall in
+    // world space (original was ~1.4 cm), about 70% of the card text.
+    // Canvas and plane share the same aspect ratio (1024/112 = 0.64/0.07).
+    this.soundHint = createTextPlane({
+      width: 0.64, height: 0.07,
+      canvasWidth: 1024, canvasHeight: 112,
+      text: '', align: 'center', color: '#E2FBF4', fontSize: 52,
+      background: 'rgba(6, 32, 30, 0.55)', backgroundRadius: 24
+    });
+    this.soundHint.mesh.position.y = 0.1 + 0.012 + 0.07 / 2;
+    this.soundHint.mesh.material.opacity = 0.9;
+    this.panel.object3D.add(this.soundHint.mesh);
 
     var attach = () => {
-      this.el.sceneEl.addEventListener('wave-state-changed', (evt) => this.updateText(evt.detail));
+      this.onWaveStateChanged = (evt) => this.updateText(evt.detail);
+      this.onSoundStateChanged = (evt) => this.updateSoundHint(evt.detail.enabled);
+      this.el.sceneEl.addEventListener('wave-state-changed', this.onWaveStateChanged);
+      this.el.sceneEl.addEventListener('sound-state-changed', this.onSoundStateChanged);
+      var soundManager = this.el.sceneEl.components['sound-manager'];
+      if (soundManager) this.updateSoundHint(soundManager.soundEnabled);
     };
     if (this.el.sceneEl.hasLoaded) attach();
     else this.el.sceneEl.addEventListener('loaded', attach);
+  },
+
+  updateSoundHint: function (enabled) {
+    var lang = I18N[LANG];
+    this.soundHint.setText(enabled ? lang.muteSoundHint : lang.unmuteSoundHint);
   },
 
   updateText: function (detail) {
@@ -75,5 +99,19 @@ AFRAME.registerComponent('wave-hud', {
       this.announcementTimeout = null;
       this.card.setText(this.baseText);
     }, 5000);
+  },
+
+  remove: function () {
+    if (this.onWaveStateChanged) {
+      this.el.sceneEl.removeEventListener('wave-state-changed', this.onWaveStateChanged);
+      this.el.sceneEl.removeEventListener('sound-state-changed', this.onSoundStateChanged);
+    }
+    if (this.announcementTimeout !== null) clearTimeout(this.announcementTimeout);
+    this.card.mesh.geometry.dispose();
+    this.card.mesh.material.map.dispose();
+    this.card.mesh.material.dispose();
+    this.soundHint.mesh.geometry.dispose();
+    this.soundHint.mesh.material.map.dispose();
+    this.soundHint.mesh.material.dispose();
   }
 });

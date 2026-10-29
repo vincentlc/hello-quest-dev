@@ -71,9 +71,14 @@ AFRAME.registerComponent('round-celebration', {
     var forward = new THREE.Vector3();
     camera.getWorldPosition(cameraPosition);
     camera.getWorldDirection(forward);
-    this.group.position.copy(cameraPosition).addScaledVector(forward, 1.8);
-    this.group.position.y += 0.12;
+    // Slightly below eye level (along the view's own up axis): the HUD
+    // card above grows downward with the round's bonus breakdown, and a
+    // banner at eye level overlapped it from round 5 on.
     camera.getWorldQuaternion(this.group.quaternion);
+    var up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.quaternion);
+    this.group.position.copy(cameraPosition)
+      .addScaledVector(forward, 1.8)
+      .addScaledVector(up, -0.12);
     this.group.visible = true;
     this.startedAt = performance.now();
     this.activeRound = roundNumber;

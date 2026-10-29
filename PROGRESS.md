@@ -22,9 +22,10 @@ not current.
 
 ## Status at a glance
 
-**Current step: Step 6 (sound + haptics) — not started.** Steps 1-5bis and
-7 and 9 are done (desktop/Browser-pane verified; see the caveat below).
-Step 7 was picked up out of order (user request); 6 and 8 are still open.
+**Current step: Step 6 (sound + haptics) — implemented; rendered verification
+pending.** Steps 1-5bis and 7 and 9 are done (desktop/Browser-pane verified;
+see the caveat below). Step 7 was picked up out of order (user request);
+8 is still open.
 Step 10's implementation is complete, with rendered visual verification
 still pending. Step 11's adaptive transitions and assets are implemented;
 rendered verification is pending. Step 12 remains open. Step 13 is
@@ -44,7 +45,7 @@ Keep that in mind before calling anything "done" in the VR-comfort sense.
 | 4 | 3-hit reactions + snowball packing/stacking | ✅ Done |
 | 5 | Explosion + respawn | ✅ Done |
 | 5 bis | Wave/level director (multi-snowman waves, HUD) | ✅ Done |
-| 6 | Sound + haptics | ⬜ Not started |
+| 6 | Sound + haptics | ✅ Implemented; rendered verification pending |
 | 7 | HUD fix + welcome/credits screens + accent fallback | ✅ Done |
 | 8 | Performance pass + README/ASSETS.md + final docs grep | ⬜ Not started |
 | 9 | Desktop turn controls (rotate, not strafe, on Left/Right) | ✅ Done |
@@ -1223,20 +1224,51 @@ more requests:
 </details>
 
 <details>
-<summary><strong>Step 6 — sound + haptics (⬜ Not started)</strong></summary>
+<summary><strong>Step 6 — sound + haptics (✅ Implemented; rendered verification pending)</strong></summary>
 
-**Step 6 — sound + haptics: not started.** Same access problem as the sky
-image is likely for Kenney/Freesound — the user will probably need to
-download the Kenney Impact Sounds zip and the Freesound wind clip themselves
-(same workaround: their browser, save to this project folder, Claude reads it
-directly). Planned sourcing (from earlier planning, still valid): Kenney
-`impactSoft_medium_000.ogg` + `footstep_snow_000.ogg` (hit 1),
-`impactSoft_heavy_000.ogg` + `impactGlass_light_000.ogg` (hit 2),
-`impactGlass_heavy_000.ogg` + synthesized noise burst (explosion); throw
-whoosh and respawn chime synthesized (Web Audio), no CC0 source found for
-those; ambience: Freesound "Soft Wind Ambience.wav" by cribbler (CC0 1.0, id
-380379), loop-crossfaded locally with ffmpeg since it isn't natively
-loopable. `CONFIG.volume` and `CONFIG.haptics` are already defined.
+**Step 6 — sound + haptics: implemented; rendered verification pending.**
+Sound polish pass (third iteration, after listening tests on demo files):
+
+- **Impacts** were one sharp-decaying noise burst that read as "knocking
+  on wood". Now synthesized as snow: soft 12 ms attack, low "pomf" body,
+  soft granular crunch and powder spray (6 pre-rendered variants, random
+  pitch/volume). Spatialized at the hit point with HRTF; loudness is
+  capped at `impactRefDistance` (3.5 m) so close hits are never harsh, and
+  far hits lose highs.
+- **Throw**: soft arm/sleeve swish; the envelope reaches zero before the
+  buffer ends (the earlier version clicked at the end).
+- **Footsteps**: synthesis never sounded natural, replaced by 8 real CC0
+  snow-step recordings, random pick without repeats, +-4% pitch, lowpass.
+- **Birds**: the Ecuador fío-fío (noisy field recording whose background
+  appeared and vanished with each call) is replaced by rayadito and
+  chucao recordings from Chiloé (Marc Anderson, CC BY-NC-ND 4.0). Files
+  ship unmodified; only excerpts play, with fades/filters at runtime.
+  Species alternate, left/right at 10-15 m, from round 6.
+- **Wind bed**: very quiet generated loop from audio unlock, so sounds
+  never appear out of silence.
+- Gentle limiter on the master bus; synth buffers render in small chunks
+  after unlock to avoid a frame hitch on Quest.
+- Mute hint is larger (~2.4 cm text) and sits above the HUD card; the
+  panel moved down 4 cm to keep the hint inside the crisp lens zone.
+
+Audio unlocks on the first user gesture. Pressing keyboard A or the right
+controller's A button toggles sound. Throw, hit, and explosion haptics use
+the existing `CONFIG.haptics` values. Licenses and attribution in
+`ASSETS.md`. Volumes still need tuning in the headset.
+
+Feedback round after first play test:
+- Overall volume lowered (`CONFIG.volume.master` 0.7); close impacts and
+  explosions softer (`impactRefDistance` 5 m, lower hit/explosion gain).
+- Birds louder, chucao boosted (x1.5) and more frequent (~60% of calls);
+  several calls per round instead of one.
+- Footsteps keep a steady walking cadence (0.6 m / 560 ms) instead of
+  speeding up with accelerating desktop movement.
+- Landscape changes (rounds 5 and 9) now fade out, swap and fade in
+  during the intermission, after the round banner; the next round's
+  snowmen spawn only after `landscape-changed` (wave-director asks
+  landscape-director via `prepareForWave`).
+- Round-complete banner moved slightly below eye level so it no longer
+  covers the HUD card's bonus breakdown.
 
 
 </details>
@@ -1692,8 +1724,10 @@ real Quest 2.
 <details>
 <summary><strong>Step 11 — adaptive landscape progression (✅ Implemented; rendered verification pending)</strong></summary>
 
-Landscape swaps now fade the view to black before changing the sky, ground,
-and fog, then fade back in (350 ms out, 450 ms in). This also works when a
+Landscape swaps now fade the full view to black, hold there while changing
+the sky, ground, and fog, then progressively reveal the new background
+(500 ms out, 200 ms black hold, 950 ms in). The camera overlay is sized to
+cover the view. This also works when a
 restart returns the run to an earlier landscape.
 
 The scene now has three landscape entries. `snowy_park_01_4k.hdr` from
@@ -1874,6 +1908,11 @@ The per-wave throw and hit counters reset at each wave; a dedicated
 `snowball-hit-registered` event carries the throw ID and is emitted before
 snowman hit handling, so the final impact is included while throws from an
 intermission or a previous wave cannot inflate the next wave's accuracy.
+
+**Accuracy fix:** the wave director's `snowball-thrown` and
+`snowball-hit-registered` listeners now forward their event objects to the
+counter handlers. They previously discarded the payload, leaving every
+throw ID undefined and every accuracy bonus at `0/0`.
 
 **Follow-up adjustment:** Accuracy now starts in round 1, rather than round
 7, and its maximum share grows from 25% by 5 percentage points per round up

@@ -1,6 +1,6 @@
 # Assets
 
-Every non-code asset used in this demo, where it came from, and its license. CC0 by default, with one explicit CC-BY exception below (the 3D model), used by the user's choice and credited as its license requires.
+Every non-code asset used in this demo, where it came from, and its license. Licenses are listed per asset; required attribution is included below.
 
 ## 3D model
 
@@ -31,4 +31,28 @@ The second sky variant was downloaded as `snowy_park_01_4k.hdr`; the third now u
 
 ## Sound
 
-Not sourced yet (step 6 of the build). Plan: Kenney Impact Sounds pack (CC0) for hit thuds/cracks/shatter, Freesound CC0 clip for wind ambience, and a few effects (throw whoosh, respawn chime) synthesized directly with the Web Audio API since no suitable CC0 sample was found quickly for those. Will be filled in with exact files/authors/links once downloaded.
+| File | Source | Author | License |
+|---|---|---|---|
+| `assets/audio/rayadito-xc1075472.mp3` | [Xeno-canto XC1075472](https://www.xeno-canto.org/1075472), Thorn-tailed Rayadito (*Aphrastura spinicauda*), Parque Tepuhueico, Chiloé, Chile, 2025 | Marc Anderson | [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/) |
+| `assets/audio/chucao-xc1075454.mp3` | [Xeno-canto XC1075454](https://www.xeno-canto.org/1075454), Chucao Tapaculo (*Scelorchilus rubecula*), Parque Tepuhueico, Chiloé, Chile, 2025 | Marc Anderson | [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/) |
+| `assets/audio/steps/snow-step-01..08.ogg` | 8 of the [41 snow shoe steps](https://opengameart.org/content/41-snow-shoe-steps) (originals 23, 27, 33, 17, 25, 22, 41, 18), extracted from [Freesound #29876](https://freesound.org/s/29876/) | Corsica_S (recording), Iwan Gabovitch (extraction) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) |
+
+**Bird recordings (NoDerivatives):** both files are the original
+xeno-canto downloads, byte-for-byte unmodified (only renamed). The
+license allows sharing the material "in whole or in part" but not
+sharing adapted versions, so nothing is cut, filtered or re-encoded in
+the repo. `sound-manager.js` plays only short excerpts (start/end times
+in `BIRD_SPECIES`), and applies fades, a highpass, distance filtering
+and 3D placement at playback time. NonCommercial: fine while this
+project stays free; confirm with the recordist before any use that
+could count as commercial.
+
+**Attribution:** "Thorn-tailed Rayadito (Aphrastura spinicauda),
+XC1075472" and "Chucao Tapaculo (Scelorchilus rubecula), XC1075454" by
+Marc Anderson, via xeno-canto, licensed under CC BY-NC-ND 4.0.
+
+**Snow steps:** trimmed to the step, peak-normalized, converted to mono
+Ogg Vorbis. CC0, no attribution required (credited anyway).
+
+**Synthesized in code:** the throw swish, snowball impacts and the wind
+bed are generated with plain JS at audio unlock (no sample files).
